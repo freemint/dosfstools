@@ -23,6 +23,8 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+extern int atari_format;	/* Use Atari variation of MS-DOS FS format */
+
 /* program_name used for printing messages; no name will be printed when it is
  * left as NULL */
 extern const char *program_name;
@@ -58,5 +60,12 @@ char get_key(const char *valid, const char *prompt);
 
 /* Displays PROMPT and waits for user input. Only characters in VALID are
    accepted. Terminates the program on EOF. Returns the character. */
+
+void check_atari(void);
+
+/*
+ * ++roman: On m68k Linux, check if this is an Atari; if yes, turn on Atari
+ * variant of MS-DOS filesystem by default.
+ */
 
 #endif
