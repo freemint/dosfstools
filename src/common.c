@@ -32,6 +32,10 @@
 
 #include "common.h"
 
+
+const char *program_name;
+
+
 typedef struct _link {
     void *data;
     struct _link *next;
@@ -40,6 +44,9 @@ typedef struct _link {
 void die(const char *msg, ...)
 {
     va_list args;
+
+    if (program_name)
+	fprintf(stderr, "%s: ", program_name);
 
     va_start(args, msg);
     vfprintf(stderr, msg, args);
@@ -51,6 +58,9 @@ void die(const char *msg, ...)
 void pdie(const char *msg, ...)
 {
     va_list args;
+
+    if (program_name)
+	fprintf(stderr, "%s: ", program_name);
 
     va_start(args, msg);
     vfprintf(stderr, msg, args);
