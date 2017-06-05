@@ -33,6 +33,9 @@
 #include "common.h"
 
 
+#ifdef __MINT__
+int preen;
+#endif
 int atari_format;
 const char *program_name;
 
@@ -136,6 +139,9 @@ char get_key(const char *valid, const char *prompt)
  */
 void check_atari(void)
 {
+#ifdef __MINT__
+    atari_format = -1;
+#else
 #ifdef __mc68000__
     FILE *f;
     char line[128], *p;
@@ -155,5 +161,6 @@ void check_atari(void)
 	}
     }
     fclose(f);
+#endif
 #endif
 }

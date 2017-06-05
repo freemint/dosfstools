@@ -52,7 +52,12 @@ static void usage(char *name)
     fprintf(stderr, "usage: %s [-aAbflrtvVwy] [-d path -d ...] "
 	    "[-u path -u ...]\n%15sdevice\n", name, "");
     fprintf(stderr, "  -a       automatically repair the filesystem\n");
+#ifdef __MINT__
+    fprintf(stderr, "  -A       force DOS filesystem format\n");
+    fprintf(stderr, "  -AA      force Atari filesystem format\n");
+#else
     fprintf(stderr, "  -A       toggle Atari filesystem format\n");
+#endif
     fprintf(stderr, "  -b       make read-only boot sector check\n");
     fprintf(stderr,
 	    "  -c N     use DOS codepage N to decode short file names (default: %d)\n",
@@ -87,10 +92,19 @@ int main(int argc, char **argv)
     while ((c = getopt(argc, argv, "Aac:d:bflnprtu:vVwy")) != -1)
 	switch (c) {
 	case 'A':		/* toggle Atari format */
+#ifdef __MINT__
+	    if (atari_format == -1)
+	        atari_format = 0;
+#endif
 	    atari_format = !atari_format;
 	    break;
-	case 'a':
 	case 'p':
+#ifdef __MINT__
+	    verify = 1;
+	    preen = 1;
+	    /* Fall thru */
+#endif
+	case 'a':
 	case 'y':
 	    rw = 1;
 	    interactive = 0;
@@ -149,6 +163,12 @@ int main(int argc, char **argv)
 
     printf("fsck.fat " VERSION " (" VERSION_DATE ")\n");
     fs_open(argv[optind], rw);
+#ifdef __MINT__
+    if (atari_format == -1)
+        atari_format = fs_type();
+    if (atari_format == -1)
+        die("Couldn't autodetect format. Please specify with -A or -AA");
+#endif
 
     read_boot(&fs);
     if (boot_only)
@@ -156,8 +176,9 @@ int main(int argc, char **argv)
 
     if (verify)
 	printf("Starting check/repair pass.\n");
-    while (read_fat(&fs), scan_root(&fs))
+    while (read_fat(&fs), !preen && scan_root(&fs))
 	qfree(&mem_queue);
+    if (!preen) {
     if (test)
 	fix_bad(&fs);
     if (salvage_files)
@@ -185,6 +206,10 @@ exit:
 		printf("Performing changes.\n");
 	} else
 	    printf("Leaving filesystem unchanged.\n");
+    }
+    } else
+    {
+        printf("Filesystem is clean.\n");
     }
 
     if (!boot_only)
