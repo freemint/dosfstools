@@ -1,6 +1,10 @@
 #include "charconv.h"
 #include <iconv.h>
+#ifndef __MINT__
 #include <langinfo.h>
+#else
+#define nl_langinfo(x) "ATARIST"
+#endif
 #include <locale.h>
 #include <stdio.h>
 

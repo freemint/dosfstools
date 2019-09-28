@@ -25,7 +25,9 @@ fscklabel_common_sources = boot.c boot.h check.c check.h common.c common.h \
 			   charconv.c charconv.h msdos_fs.h \
 			   fsck.fat.h endian_compat.h mint_io.c mint_io.h
 fsck_fat_SOURCES = fsck.fat.c $(fscklabel_common_sources)
+fsck_fat_LDADD = $(LIBICONV)
 fatlabel_SOURCES = fatlabel.c $(fscklabel_common_sources)
+fatlabel_LDADD = $(LIBICONV)
 
 mkfs_common_sources = device_info.c device_info.h \
 		      blkdev/blkdev.c blkdev/blkdev.h \
@@ -36,11 +38,13 @@ mkfs_fat_SOURCES  = mkfs.fat.c msdos_fs.h $(mkfs_common_sources)
 mkfs_fat_CPPFLAGS = -I$(srcdir)/blkdev
 mkfs_fat_CFLAGS   = $(AM_CFLAGS) $(UDEV_CFLAGS)
 mkfs_fat_LDADD    = $(UDEV_LIBS)
+mkfs_fat_LDADD   += $(LIBICONV)
 
 testdevinfo_SOURCES  = testdevinfo.c $(mkfs_common_sources)
 testdevinfo_CPPFLAGS = -I$(srcdir)/blkdev
 testdevinfo_CFLAGS   = $(AM_CFLAGS) $(UDEV_CFLAGS)
 testdevinfo_LDADD    = $(UDEV_LIBS)
+testdevinfo_LDADD   += $(LIBICONV)
 
 
 if COMPAT_SYMLINKS
