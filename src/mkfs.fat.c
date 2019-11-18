@@ -47,6 +47,10 @@
 
 #include "version.h"
 
+#ifdef __MINT__
+#define _GNU_SOURCE
+#endif
+
 #include <fcntl.h>
 #include <signal.h>
 #include <string.h>

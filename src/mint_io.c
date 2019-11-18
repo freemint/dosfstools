@@ -27,6 +27,7 @@
 # include <sys/stat.h>
 
 # include <mintbind.h>
+# include "io.h"
 # include "mint_io.h"
 
 
