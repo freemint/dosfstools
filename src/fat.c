@@ -81,10 +81,13 @@ static char print_fat_dirty_state(void)
     printf("Dirty bit is set. Fs was not properly unmounted and"
 	   " some data may be corrupt.\n");
 
-    return get_choice(1, " Automatically removing dirty bit.",
-		      2,
-		      1, "Remove dirty bit",
-		      2, "No action");
+    if (interactive) {
+        printf("1) Remove dirty bit\n2) No action\n");
+        return get_key("12", "?") == '1';
+    } else {
+        printf(" Automatically removing dirty bit.\n");
+        return 0;
+    }
 }
 
 static void check_fat_state_bit(DOS_FS * fs)
