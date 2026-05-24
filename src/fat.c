@@ -86,7 +86,7 @@ static char print_fat_dirty_state(void)
         return get_key("12", "?") == '1';
     } else {
         printf(" Automatically removing dirty bit.\n");
-        return 0;
+        return 1;
     }
 }
 

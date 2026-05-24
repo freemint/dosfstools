@@ -324,8 +324,13 @@ static long rwabs_xhdi(struct device *mydev, ushort rw, void *buf, ulong size, u
 
 	if (!n || (recno + n) > mydev->xhdi_blocks)
 	{
+		/* Return an error instead of aborting: callers such as fs_test()
+		 * probe the last sector and are expected to tolerate a failed
+		 * read (e.g. when the BPB total_sect exceeds the XHDI partition
+		 * size, as happens on some FAT32 partitions). */
 		printf("rwabs_xhdi: access outside partition (drv = %c:)\n", 'A' + mydev->drv);
-		exit(2);
+		__set_errno(EIO);
+		return -1;
 	}
 
 	if (n > 65535UL)
