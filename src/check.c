@@ -146,6 +146,7 @@ static int bad_name(DOS_FILE * file)
 {
     int i, spc, suspicious = 0;
     const char *bad_chars = atari_format ? "*?\\/:" : "*?<>|\"\\/:.";
+    const char *allowed_nonascii = atari_format ? "\200\216\217\220\222\231\232\245\265\266\267\270\236" : "\200\216\217\220\222\231\232\245\265\266\267\270\341";
     const unsigned char *name = file->dir_ent.name;
     const unsigned char *ext = name + 8;
 
@@ -156,8 +157,11 @@ static int bad_name(DOS_FILE * file)
     for (i = 0; i < MSDOS_NAME; i++) {
 	if ((name[i] < ' ' && !(i == 0 && name[0] == 0x05)) || name[i] == 0x7f)
 	    return 1;
-	if (name[i] > 0x7f)
-	    ++suspicious;
+	if (name[i] > 0x7f) {
+		/* german umlauts are fully legally under MS-DOS/GEMDOS */
+		if (strchr(allowed_nonascii, name[i]) == NULL)
+			++suspicious;
+	}
 	if (strchr(bad_chars, name[i]))
 	    return 1;
     }
