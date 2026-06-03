@@ -144,7 +144,7 @@ static char *file_stat(DOS_FILE * file)
 
 static int bad_name(DOS_FILE * file)
 {
-    int i, spc, suspicious = 0;
+    int i, spc;
     const char *bad_chars = atari_format ? "*?\\/:" : "*?<>|\"\\/:.";
     const unsigned char *name = file->dir_ent.name;
     const unsigned char *ext = name + 8;
@@ -156,8 +156,6 @@ static int bad_name(DOS_FILE * file)
     for (i = 0; i < MSDOS_NAME; i++) {
 	if ((name[i] < ' ' && !(i == 0 && name[0] == 0x05)) || name[i] == 0x7f)
 	    return 1;
-	if (name[i] > 0x7f)
-	    ++suspicious;
 	if (strchr(bad_chars, name[i]))
 	    return 1;
     }
@@ -187,11 +185,7 @@ static int bad_name(DOS_FILE * file)
 	}
     }
 
-    /* Under GEMDOS, chars >= 128 are never allowed. */
-    if (atari_format && suspicious)
-	return 1;
-
-    /* Under MS-DOS and Windows, chars >= 128 in short names are valid
+    /* Under MS-DOS, Windows and GEMDOS, chars >= 128 in short names are valid
      * (but these characters can be visualised differently depending on
      * local codepage: CP437, CP866, etc). The chars are all basically ok,
      * so we shouldn't auto-correct such names. */
