@@ -71,7 +71,7 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -a              automatically repair the filesystem\n");
-    fprintf(stderr, "  -A              toggle Atari variant of the FAT filesystem\n");
+    fprintf(stderr, "  -A              select the Atari variant of the FAT filesystem\n");
     fprintf(stderr, "  -b              make read-only boot sector check\n");
     fprintf(stderr, "  -c N            use DOS codepage N to decode short file names (default: %d)\n",
 	    DEFAULT_DOS_CODEPAGE);
@@ -89,7 +89,7 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "  -U              allow only uppercase characters in volume and boot label\n");
     fprintf(stderr, "  -v              verbose mode\n");
     fprintf(stderr, "  -V              perform a verification pass\n");
-    fprintf(stderr, "  --variant=TYPE  handle variant TYPE of the filesystem\n");
+    fprintf(stderr, "  --variant=TYPE  select variant TYPE of filesystem (standard or atari)\n");
     fprintf(stderr, "  -w              write changes to disk immediately\n");
     fprintf(stderr, "  -y              same as -a, for compat with other *fsck\n");
     fprintf(stderr, "  --help          print this message\n");
