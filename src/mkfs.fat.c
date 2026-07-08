@@ -1504,7 +1504,8 @@ static void usage(const char *name, int exitval)
     fprintf(stderr, "  -b SECTOR       Select SECTOR as location of the FAT32 backup boot sector\n");
     fprintf(stderr, "  -c              Check device for bad blocks before creating the filesystem\n");
     fprintf(stderr, "  -C              Create file TARGET then create filesystem in it\n");
-    fprintf(stderr, "  -D NUMBER       Write BIOS drive number NUMBER to boot sector\n");
+	fprintf(stderr, "  --codepage=N    Use DOS codepage N to encode label (default: %d)\n", DEFAULT_DOS_CODEPAGE);
+	fprintf(stderr, "  -D NUMBER       Write BIOS drive number NUMBER to boot sector\n");
     fprintf(stderr, "  -f COUNT        Create COUNT file allocation tables\n");
     fprintf(stderr, "  -F SIZE         Select FAT size SIZE (12, 16 or 32)\n");
     fprintf(stderr, "  -g GEOM         Select disk geometry: heads/sectors_per_track\n");
@@ -1516,15 +1517,14 @@ static void usage(const char *name, int exitval)
     fprintf(stderr, "  -M TYPE         Set media type in boot sector to TYPE\n");
     fprintf(stderr, "  --mbr[=y|n|a]   Fill (fake) MBR table with one partition which spans whole disk\n");
     fprintf(stderr, "  -n LABEL        Set volume name to LABEL (up to 11 characters long)\n");
-    fprintf(stderr, "  --codepage=N    use DOS codepage N to encode label (default: %d)\n", DEFAULT_DOS_CODEPAGE);
-    fprintf(stderr, "  -r COUNT        Make room for at least COUNT entries in the root directory\n");
+    fprintf(stderr, "  --offset=SECTOR Write the filesystem at a specific sector into the device file.\n");
+	fprintf(stderr, "  -r COUNT        Make room for at least COUNT entries in the root directory\n");
     fprintf(stderr, "  -R COUNT        Set minimal number of reserved sectors to COUNT\n");
     fprintf(stderr, "  -s COUNT        Set number of sectors per cluster to COUNT\n");
     fprintf(stderr, "  -S SIZE         Select a sector size of SIZE (a power of two, at least 512)\n");
     fprintf(stderr, "  -v              Verbose execution\n");
-    fprintf(stderr, "  --variant=TYPE  Select variant TYPE of filesystem (standard or Atari)\n");
+    fprintf(stderr, "  --variant=TYPE  Select variant TYPE of filesystem (standard or atari)\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "  --offset=SECTOR Write the filesystem at a specific sector into the device file.\n");
     fprintf(stderr, "  --help          Show this help message and exit\n");
     exit(exitval);
 }
