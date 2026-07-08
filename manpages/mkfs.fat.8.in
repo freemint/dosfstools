@@ -43,19 +43,23 @@ available space.
 Two different variants of the FAT filesystem are supported.
 Standard is the FAT12, FAT16 and FAT32 filesystems as defined by Microsoft and
 widely used on hard disks and removable media like USB sticks and SD cards.
-The other is the legacy Atari variant used on Atari ST.
+The other is the legacy Atari variant used on Atari ST; a hard disk partition
+that TOS is to mount needs it.
 .PP
 In Atari mode, if not directed otherwise by the user, \fBmkfs.fat\fP will
 always use 2 sectors per cluster, since GEMDOS doesn't like other values very
 much.
 It will also obey the maximum number of sectors GEMDOS can handle.
-Larger filesystems are managed by raising the logical sector size.
-An Atari-compatible serial number for the filesystem is generated, and a 12 bit
-FAT is used only for filesystems that have one of the usual floppy sizes (720k,
-1.2M, 1.44M, 2.88M), a 16 bit FAT otherwise.
+Larger filesystems are managed by raising the logical sector size, up to 16 KiB;
+this limits an Atari filesystem to just under 1 GiB.
+A 12 bit FAT is used only for filesystems that have one of the usual floppy
+sizes (720k, 1.2M, 1.44M, 2.88M), a 16 bit FAT otherwise.
 This can be overridden with the \fB\-F\fP option.
-Some PC-specific boot sector fields aren't written, and a boot message (option
-\fB\-m\fP) is ignored.
+A 32 bit FAT is never chosen automatically in Atari mode, and always uses the
+standard variant.
+The boot sector always uses the MS-DOS layout; on a 12 bit FAT an
+Atari-compatible 24 bit serial number is additionally stored at offset 8, so
+that TOS can detect a media change.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4
@@ -67,9 +71,8 @@ This option disables alignment; this may provide a handful of additional
 clusters of storage at the expense of a significant performance degradation on
 RAIDs, flash media or large-sector hard disks.
 .IP "\fB\-A\fP" 4
-Select using the Atari variation of the FAT filesystem if that isn't active
-already, otherwise select standard FAT filesystem.
-This is selected by default if \fBmkfs.fat\fP is run on 68k Atari Linux.
+Select the Atari variation of the FAT filesystem.
+This is equivalent to \fB\-\-variant\fP \fIatari\fP.
 .IP "\fB\-b\fP \fISECTOR-OF-BACKUP\fP" 4
 Selects the location of the backup boot sector for FAT32.
 Default depends on number of reserved sectors, but usually is sector 6.
@@ -135,6 +138,8 @@ Use this option to override this behaviour.
 Sets the volume ID of the newly created filesystem; \fIVOLUME-ID\fP is a 32-bit
 hexadecimal number (for example, 2e24ec82).
 The default is a number which depends on the filesystem creation time.
+If the boot sector would then happen to be executable by TOS, the lowest bit
+of the ID is flipped and a warning is printed.
 .IP "\fB\-I\fP" 4
 Ignore and disable safety checks.
 By default \fBmkfs.fat\fP refuses to create a filesystem on a device with
@@ -170,6 +175,8 @@ non-removable disks when formatting whole unpartitioned disk.
 .IP "\fB\-n\fP \fIVOLUME-NAME\fP" 4
 Sets the volume name (label) of the filesystem.
 The volume name can be up to 11 characters long.
+The characters \fB"*+,./:;<=>?[\e]|\fP are not allowed, in Atari mode only
+\fB*?\e/:".\fP.
 Supplying an empty string, a string consisting only of white space or the
 string "NO NAME" as \fIVOLUME-NAME\fP has the same effect as not giving the
 \fB\-n\fP option.
@@ -211,6 +218,7 @@ having to set up a loop device.
 Create a filesystem of variant \fITYPE\fP.
 Acceptable values are \fIstandard\fP and \fIatari\fP (in any combination of
 upper/lower case).
+The default is \fIstandard\fP.
 See above under DESCRIPTION for the differences.
 .IP "\fB\-\-help\fP" 4
 Display option summary and exit.

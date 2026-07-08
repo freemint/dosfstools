@@ -92,6 +92,8 @@ Invalid labels are removed.
 .IP "\(bu" 4
 Volume label in root directory and label in boot sector are different.
 Volume label from root directory is copied to boot sector.
+Where boot code occupies the label field of the boot sector, the label is kept
+in the root directory only.
 .IP "\(bu" 4
 Clusters are marked as used but are not owned by a file.
 They are marked as free.
@@ -110,12 +112,14 @@ widely used on hard disks and removable media like USB sticks and SD cards.
 The other is the legacy Atari variant used on Atari ST.
 .PP
 There are some minor differences in Atari format:
-Some boot sector fields are interpreted slightly different, and the special FAT
-entries for end-of-file and bad cluster can be different.
+The special FAT entries for end-of-file and bad cluster can be different.
 Under MS-DOS 0xfff8 is used for EOF and Atari employs 0xffff by default, but
 both systems recognize all values from 0xfff8\(en0xffff as end-of-file.
 MS-DOS uses only 0xfff7 for bad clusters, where on Atari values 0xfff0\(en0xfff7
 are for this purpose (but the standard value is still 0xfff7).
+In short file names and volume labels GEMDOS rejects only the characters
+\fB*?\e/:".\fP, while MS-DOS also rejects \fB<>|\fP in file names and
+\fB+,;<=>[]|\fP in labels.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4
@@ -124,9 +128,8 @@ No user intervention is necessary.
 Whenever there is more than one method to solve a problem, the least
 destructive approach is used.
 .IP "\fB\-A\fP" 4
-Select using the Atari variation of the FAT filesystem if that isn't active
-already, otherwise select standard FAT filesystem.
-This is selected by default if \fBmkfs.fat\fP is run on 68k Atari Linux.
+Select the Atari variation of the FAT filesystem.
+This is equivalent to \fB\-\-variant\fP \fIatari\fP.
 .IP "\fB-b\fP" 4
 Make read-only boot sector check.
 .IP "\fB-c\fP \fIPAGE\fP" 4
@@ -208,7 +211,7 @@ It may take considerably longer than the first pass, because the first pass may
 have generated long list of modifications that have to be scanned for each disk
 read.
 .IP "\fB\-\-variant\fP \fITYPE\fP" 4
-Create a filesystem of variant \fITYPE\fP.
+Handle a filesystem of variant \fITYPE\fP.
 Acceptable values are \fIstandard\fP and \fIatari\fP (in any combination of
 upper/lower case).
 See above under DESCRIPTION for the differences.
