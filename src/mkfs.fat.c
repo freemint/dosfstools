@@ -97,7 +97,7 @@ static inline int cdiv(int a, int b)
 }
 
 /* FAT values */
-#define FAT_EOF      (atari_format ? 0x0fffffff : 0x0ffffff8)
+#define FAT_EOF      (gemdos_semantics ? 0x0fffffff : 0x0ffffff8)
 #define FAT_BAD      0x0ffffff7
 
 #define MSDOS_EXT_SIGN 0x29	/* extended boot sector signature */
@@ -619,7 +619,7 @@ static void establish_params(struct device_info *info)
 		sec_per_track = 15;
 		heads = 2;
 		media = 0xf9;
-		cluster_size = (atari_format ? 2 : 1);
+		cluster_size = (gemdos_semantics ? 2 : 1);
 		def_root_dir_entries = 224;
 		break;
 
@@ -627,7 +627,7 @@ static void establish_params(struct device_info *info)
 		sec_per_track = 18;
 		heads = 2;
 		media = 0xf0;
-		cluster_size = (atari_format ? 2 : 1);
+		cluster_size = (gemdos_semantics ? 2 : 1);
 		def_root_dir_entries = 224;
 		break;
 
@@ -702,7 +702,7 @@ static void setup_tables(void)
     int ret;
     int i;
 
-    if (atari_format) {
+    if (atari_boot_layout) {
 	/* On Atari, the first few bytes of the boot sector are assigned
 	 * differently: The jump code is only 2 bytes (and m68k machine code
 	 * :-), then 6 bytes filler (ignored), then 3 byte serial number. */
@@ -732,7 +732,7 @@ static void setup_tables(void)
 	root_dir_entries = 0;
     }
 
-    if (atari_format) {
+    if (atari_boot_layout) {
 	bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
 	bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
 	bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
@@ -768,7 +768,7 @@ static void setup_tables(void)
     if (ret & 0x10)
 	die("Label can't start with a space character");
 
-    if (!atari_format) {
+    if (!atari_boot_layout) {
 	memcpy(vi->volume_label, label, 11);
 
 	memcpy(bs.boot_jump, dummy_boot_jump, 3);
@@ -807,7 +807,7 @@ static void setup_tables(void)
     if (verbose >= 2)
 	printf("Using %d reserved sectors\n", reserved_sectors);
     bs.fats = (char)nr_fats;
-    if (!atari_format || size_fat == 32)
+    if (!atari_boot_layout || size_fat == 32)
 	bs.hidden = htole32(hidden_sectors);
     else {
 	/* In Atari format, hidden is a 16 bit field */
@@ -832,7 +832,7 @@ static void setup_tables(void)
         num_sectors = num_sectors / le16toh(bs.secs_track) * le16toh(bs.secs_track);
     }
 
-    if (!atari_format) {
+    if (!gemdos_semantics) {
 	unsigned fatdata1216;	/* Sectors for FATs + data area (FAT12/16) */
 	unsigned fatdata32;	/* Sectors for FATs + data area (FAT32) */
 	unsigned fatlength12, fatlength16, fatlength32;
@@ -1080,6 +1080,9 @@ static void setup_tables(void)
 	    bs.fat_length = 0;
 	    bs.fat32.fat32_length = htole32(fat_length);
 	}
+	if (!atari_boot_layout && size_fat != 32)
+	    memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
+		   MSDOS_FAT16_SIGN, 8);
     }
 
     if (fill_mbr_partition) {
@@ -1208,7 +1211,7 @@ static void setup_tables(void)
 	memset(&bs.fat32.reserved2, 0, sizeof(bs.fat32.reserved2));
     }
 
-    if (atari_format) {
+    if (gemdos_semantics) {
 	/* Just some consistency checks */
 	if (num_sectors >= GEMDOS_MAX_SECTORS)
 	    die("GEMDOS can't handle more than 65531 sectors");
@@ -1221,11 +1224,11 @@ static void setup_tables(void)
 	bs.total_sect = htole32(num_sectors);
     } else {
 	bs.sectors = htole16((uint16_t) num_sectors);
-	if (!atari_format)
+	if (!atari_boot_layout)
 	    bs.total_sect = htole32(0);
     }
 
-    if (!atari_format)
+    if (!atari_boot_layout)
 	vi->ext_boot_sign = MSDOS_EXT_SIGN;
 
     if (!cluster_count) {
@@ -1274,7 +1277,7 @@ static void setup_tables(void)
 		   root_dir_entries, root_dir_sectors);
 	}
 	printf("Volume ID is %08lx, ", volume_id &
-	       (atari_format ? 0x00ffffff : 0xffffffff));
+	       (atari_boot_layout ? 0x00ffffff : 0xffffffff));
 	if (memcmp(label, NO_NAME, MSDOS_NAME))
 	    printf("volume label %s.\n", volume_name);
 	else
@@ -1591,7 +1594,7 @@ int main(int argc, char **argv)
 	/* Scan the command line for options */
 	switch (c) {
 	case 'A':		/* toggle Atari format */
-	    atari_format = !atari_format;
+	    gemdos_semantics = !gemdos_semantics;
 	    break;
 
 	case 'a':		/* a : skip alignment */
@@ -1869,9 +1872,9 @@ int main(int argc, char **argv)
 
 	case OPT_VARIANT:
 	    if (!strcasecmp(optarg, "standard")) {
-		    atari_format = 0;
+		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
-		    atari_format = 1;
+		    gemdos_semantics = 1;
 	    } else {
 		    printf("Unknown variant: %s\n", optarg);
 		    usage(argv[0], 1);

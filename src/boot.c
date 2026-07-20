@@ -215,7 +215,7 @@ static void dump_boot(DOS_FS * fs, struct boot_sector *b, unsigned lss)
     unsigned short sectors;
 
     printf("Boot sector contents:\n");
-    if (!atari_format) {
+    if (!atari_boot_layout) {
 	char id[9];
 	strncpy(id, (const char *)b->system_id, 8);
 	id[8] = 0;
@@ -255,7 +255,7 @@ static void dump_boot(DOS_FS * fs, struct boot_sector *b, unsigned lss)
 	   (unsigned long long)fs->data_clusters * fs->cluster_size);
     printf("%u sectors/track, %u heads\n", le16toh(b->secs_track),
 	   le16toh(b->heads));
-    printf("%10u hidden sectors\n", atari_format ?
+    printf("%10u hidden sectors\n", atari_boot_layout ?
 	   /* On Atari, the hidden field is only 16 bit wide and unused */
 	   (((unsigned char *)&b->hidden)[0] |
 	    ((unsigned char *)&b->hidden)[1] << 8) : le32toh(b->hidden));
@@ -513,7 +513,7 @@ void read_boot(DOS_FS * fs)
 	check_backup_boot(fs, &b, logical_sector_size);
 
 	read_fsinfo(fs, &b, logical_sector_size);
-    } else if (!atari_format) {
+    } else if (!gemdos_semantics) {
 	/* On real MS-DOS, a 16 bit FAT is used whenever there would be too
 	 * much clusers otherwise. */
 	fs->fat_bits = (fs->data_clusters >= FAT12_THRESHOLD) ? 16 : 12;
@@ -570,7 +570,7 @@ void read_boot(DOS_FS * fs)
 	    "sector size.", logical_sector_size);
 #if 0				/* linux kernel doesn't check that either */
     /* ++roman: On Atari, these two fields are often left uninitialized */
-    if (!atari_format && (!b.secs_track || !b.heads))
+    if (!atari_boot_layout && (!b.secs_track || !b.heads))
 	die("Invalid disk format in boot sector.");
 #endif
     if (verbose)

@@ -145,7 +145,7 @@ static char *file_stat(DOS_FILE * file)
 static int bad_name(DOS_FILE * file)
 {
     int i, spc;
-    const char *bad_chars = atari_format ? "*?\\/:" : "*?<>|\"\\/:.";
+    const char *bad_chars = gemdos_semantics ? "*?\\/:" : "*?<>|\"\\/:.";
     const unsigned char *name = file->dir_ent.name;
     const unsigned char *ext = name + 8;
 
