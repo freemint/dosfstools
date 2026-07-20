@@ -42,7 +42,8 @@
 
 int interactive;
 int write_immed;
-int atari_format;
+int atari_boot_layout;
+int gemdos_semantics;
 const char *program_name;
 
 
@@ -287,7 +288,7 @@ void check_atari(void)
 	    p = line + 6;
 	    p += strspn(p, " \t");
 	    if (strncmp(p, "Atari ", 6) == 0)
-		atari_format = 1;
+		gemdos_semantics = 1;
 	    break;
 	}
     }

@@ -130,7 +130,7 @@ int main(int argc, char **argv)
 				    long_options, NULL)) != -1)
 	switch (c) {
 	case 'A':		/* toggle Atari format */
-	    atari_format = !atari_format;
+	    gemdos_semantics = !gemdos_semantics;
 	    break;
 	case 'a':
 	case 'p':
@@ -197,9 +197,9 @@ int main(int argc, char **argv)
 	    break;
 	case OPT_VARIANT:
 	    if (!strcasecmp(optarg, "standard")) {
-		    atari_format = 0;
+		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
-		    atari_format = 1;
+		    gemdos_semantics = 1;
 	    } else {
 		    fprintf(stderr, "Unknown variant: %s\n", optarg);
 		    usage(argv[0], 2);
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 	reclaim_file(&fs);
     else
 	reclaim_free(&fs);
-    if (!atari_format)
+    if (!atari_boot_layout)
 	check_dirty_bits(&fs);
     free_clusters = update_free(&fs);
     file_unused();
@@ -257,7 +257,7 @@ int main(int argc, char **argv)
 	scan_root(&fs);
 	check_label(&fs);
 	reclaim_free(&fs);
-	if (!atari_format)
+	if (!atari_boot_layout)
 	    check_dirty_bits(&fs);
 	qfree(&mem_queue);
     }
