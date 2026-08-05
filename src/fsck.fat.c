@@ -122,15 +122,14 @@ int main(int argc, char **argv)
     memset(&fs, 0, sizeof(fs));
     salvage_files = verify = 0;
     rw = interactive = 1;
-    check_atari();
 
     printf("fsck.fat " VERSION " (" VERSION_DATE ")\n");
 
     while ((c = getopt_long(argc, argv, "Aac:d:bfF:lnprStu:UvVwy",
 				    long_options, NULL)) != -1)
 	switch (c) {
-	case 'A':		/* toggle Atari format */
-	    gemdos_semantics = !gemdos_semantics;
+	case 'A':		/* select Atari format */
+	    gemdos_semantics = 1;
 	    break;
 	case 'a':
 	case 'p':

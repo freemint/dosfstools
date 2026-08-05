@@ -1571,7 +1571,6 @@ int main(int argc, char **argv)
     }
 
     volume_id = generate_volume_id();
-    check_atari();
 
     printf("mkfs.fat " VERSION " (" VERSION_DATE ")\n");
 
@@ -1579,8 +1578,8 @@ int main(int argc, char **argv)
 				    long_options, NULL)) != -1)
 	/* Scan the command line for options */
 	switch (c) {
-	case 'A':		/* toggle Atari format */
-	    gemdos_semantics = !gemdos_semantics;
+	case 'A':		/* select Atari format */
+	    gemdos_semantics = 1;
 	    break;
 
 	case 'a':		/* a : skip alignment */
