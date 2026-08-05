@@ -71,7 +71,7 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -a              automatically repair the filesystem\n");
-    fprintf(stderr, "  -A              toggle Atari variant of the FAT filesystem\n");
+    fprintf(stderr, "  -A              select the Atari variant of the FAT filesystem\n");
     fprintf(stderr, "  -b              make read-only boot sector check\n");
     fprintf(stderr, "  -c N            use DOS codepage N to decode short file names (default: %d)\n",
 	    DEFAULT_DOS_CODEPAGE);
@@ -122,15 +122,14 @@ int main(int argc, char **argv)
     memset(&fs, 0, sizeof(fs));
     salvage_files = verify = 0;
     rw = interactive = 1;
-    check_atari();
 
     printf("fsck.fat " VERSION " (" VERSION_DATE ")\n");
 
     while ((c = getopt_long(argc, argv, "Aac:d:bfF:lnprStu:UvVwy",
 				    long_options, NULL)) != -1)
 	switch (c) {
-	case 'A':		/* toggle Atari format */
-	    gemdos_semantics = !gemdos_semantics;
+	case 'A':		/* select Atari format */
+	    gemdos_semantics = 1;
 	    break;
 	case 'a':
 	case 'p':

@@ -98,13 +98,6 @@ char *get_line(const char *prompt, char *dest, size_t length);
  * with echo if needed.
  */
 
-void check_atari(void);
-
-/*
- * ++roman: On m68k Linux, check if this is an Atari; if yes, turn on Atari
- * variant of MS-DOS filesystem by default.
- */
-
 uint32_t generate_volume_id(void);
 
 /*

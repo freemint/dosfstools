@@ -123,9 +123,8 @@ No user intervention is necessary.
 Whenever there is more than one method to solve a problem, the least
 destructive approach is used.
 .IP "\fB\-A\fP" 4
-Select using the Atari variation of the FAT filesystem if that isn't active
-already, otherwise select standard FAT filesystem.
-This is selected by default if \fBfsck.fat\fP is run on 68k Atari Linux.
+Select the Atari variation of the FAT filesystem.
+This is equivalent to \fB\-\-variant\fP \fIatari\fP.
 .IP "\fB-b\fP" 4
 Make read-only boot sector check.
 .IP "\fB-c\fP \fIPAGE\fP" 4

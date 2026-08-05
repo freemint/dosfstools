@@ -224,8 +224,6 @@ int main(int argc, char *argv[])
     long codepage = -1;
     int c;
 
-    check_atari();
-
     while ((c = getopt_long(argc, argv, "irc:Vh", long_options, NULL)) != -1) {
 	switch (c) {
 	    case 'i':

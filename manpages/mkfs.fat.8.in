@@ -67,9 +67,8 @@ This option disables alignment; this may provide a handful of additional
 clusters of storage at the expense of a significant performance degradation on
 RAIDs, flash media or large-sector hard disks.
 .IP "\fB\-A\fP" 4
-Select using the Atari variation of the FAT filesystem if that isn't active
-already, otherwise select standard FAT filesystem.
-This is selected by default if \fBmkfs.fat\fP is run on 68k Atari Linux.
+Select the Atari variation of the FAT filesystem.
+This is equivalent to \fB\-\-variant\fP \fIatari\fP.
 .IP "\fB\-b\fP \fISECTOR-OF-BACKUP\fP" 4
 Selects the location of the backup boot sector for FAT32.
 Default depends on number of reserved sectors, but usually is sector 6.
