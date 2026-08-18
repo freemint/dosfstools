@@ -36,7 +36,10 @@ extern int interactive;
 extern int write_immed;
 /* Filesystem follows Atari GEMDOS rules rather than MS-DOS: filename
  * character set, FAT12/16 selection, special FAT values, cluster size and
- * sector-count limits. */
+ * sector-count limits.
+ * 0: MS-DOS, 1: GEMDOS, -1: decide from the filesystem (--variant=auto).
+ * -1 is resolved to 0 or 1 before anything reads it; every other consumer
+ * treats this as a plain boolean. */
 extern int gemdos_semantics;
 
 /* program_name used for printing messages; no name will be printed when it is

@@ -89,7 +89,7 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "  -U              allow only uppercase characters in volume and boot label\n");
     fprintf(stderr, "  -v              verbose mode\n");
     fprintf(stderr, "  -V              perform a verification pass\n");
-    fprintf(stderr, "  --variant=TYPE  select variant TYPE of filesystem (standard or atari)\n");
+    fprintf(stderr, "  --variant=TYPE  select variant TYPE of filesystem (standard, atari or auto)\n");
     fprintf(stderr, "  -w              write changes to disk immediately\n");
     fprintf(stderr, "  -y              same as -a, for compat with other *fsck\n");
     fprintf(stderr, "  --help          print this message\n");
@@ -199,6 +199,8 @@ int main(int argc, char **argv)
 		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
 		    gemdos_semantics = 1;
+	    } else if (!strcasecmp(optarg, "auto")) {
+		    gemdos_semantics = -1;
 	    } else {
 		    fprintf(stderr, "Unknown variant: %s\n", optarg);
 		    usage(argv[0], 2);

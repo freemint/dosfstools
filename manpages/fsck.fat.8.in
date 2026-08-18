@@ -207,8 +207,10 @@ have generated long list of modifications that have to be scanned for each disk
 read.
 .IP "\fB\-\-variant\fP \fITYPE\fP" 4
 Handle a filesystem of variant \fITYPE\fP.
-Acceptable values are \fIstandard\fP and \fIatari\fP (in any combination of
-upper/lower case).
+Acceptable values are \fIstandard\fP, \fIatari\fP and \fIauto\fP (in any
+combination of upper/lower case).
+With \fIauto\fP the variant is determined from the filesystem itself instead of
+being assumed; \fIstandard\fP is the default.
 See above under DESCRIPTION for the differences.
 .IP "\fB\-w\fP" 4
 Write changes to disk immediately.
