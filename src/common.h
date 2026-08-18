@@ -34,7 +34,10 @@
 
 extern int interactive;
 extern int write_immed;
-extern int atari_format;	/* Use Atari variation of MS-DOS FS format */
+/* Filesystem follows Atari GEMDOS rules rather than MS-DOS: filename
+ * character set, FAT12/16 selection, special FAT values, cluster size and
+ * sector-count limits. */
+extern int gemdos_semantics;
 
 /* program_name used for printing messages; no name will be printed when it is
  * left as NULL */
@@ -108,6 +111,7 @@ uint32_t generate_volume_id(void);
  * Generate a 32 bit volume ID
  */
 
+unsigned read_atari_boot_checksum(const unsigned char *sec);
 int validate_volume_label(char *doslabel);
 
 /*
