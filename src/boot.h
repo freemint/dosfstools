@@ -27,6 +27,7 @@
 #include <stdint.h>
 
 void read_boot(DOS_FS * fs);
+void write_boot(unsigned char *sec);
 void write_label(DOS_FS * fs, char *label);
 void write_boot_label(DOS_FS * fs, const char *label);
 void write_volume_label(DOS_FS * fs, char *label);
