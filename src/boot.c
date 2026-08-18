@@ -408,6 +408,71 @@ static void read_fsinfo(DOS_FS * fs, struct boot_sector *b, unsigned int lss)
 	fs->free_clusters = le32toh(i.free_clusters);
 }
 
+/* TOS executes a boot sector whose 256 big-endian words sum to 0x1234 */
+static int is_atari_bootable(const unsigned char *sec)
+{
+	/* TOS cannot read FAT32, so such a sector never holds Atari boot code */
+	if (!sec[0x16] && !sec[0x17])
+		return 0;
+	return read_atari_boot_checksum(sec) == 0x1234;
+}
+
+/* Decode the jump at byte 0 and return the offset where executable boot code
+ * begins, or -1 if the first byte is not a recognised jump. Covers the x86
+ * jumps used by DOS and the 68k BRA.S/BRA.W used by Atari TOS. */
+static int boot_code_start(const unsigned char *sec)
+{
+	switch (sec[0]) {
+	/* 68k BRA */
+	case 0x60:
+		if (sec[1] == 0x00) {
+			/* BRA.W (4 bytes, big-endian) */
+			return 2 + (short)((sec[2] << 8) | sec[3]);
+		} else {
+			/* BRA.S (2 bytes) */
+			return 2 + (signed char)sec[1];
+		}
+	/* x86 JMP rel8 (2 bytes), usually + NOP */
+	case 0xeb:
+		return 2 + (signed char)sec[1];
+	/* x86 JMP rel16 (3 bytes, little-endian) */
+	case 0xe9:
+		return 3 + (short)(sec[1] | (sec[2] << 8));
+	/* NOP + x86 JMP rel8 (DR-DOS): 90 EB disp */
+	case 0x90:
+		if (sec[1] == 0xeb)
+			return 3 + (signed char)sec[2];
+		return -1;
+	/* unrecognised first byte */
+	default:
+		return -1;
+	}
+}
+
+/* Return 0 when the boot sector is executable (DOS 0x55AA signature or Atari
+ * 0x1234 checksum) and overwriting its bytes below 'end' could corrupt the
+ * boot code, which provably starts below 'end'. Return 1 when the write is
+ * safe. */
+int check_boot_code(const unsigned char *sec, int end)
+{
+	int start = boot_code_start(sec);
+
+	/* A jump that lands inside the BPB, which ends at 0x1E at the earliest,
+	 * reaches no code: FatFs writes EB FE, a jump to itself, to mark the
+	 * sector as not bootable. */
+	if (start >= 0 && start < 0x1e)
+		return 1;
+	/* TOS boot code may start with any instruction, so an undecodable
+	 * entry point fails the test */
+	if (is_atari_bootable(sec))
+		return start >= end;
+	/* x86 boot code has to jump over the BPB; without a jump at byte 0, the
+	 * signature only marks a valid sector */
+	if (sec[0x1fe] == 0x55 && sec[0x1ff] == 0xaa)
+		return start < 0 || start >= end;
+	return 1;
+}
+
 void read_boot(DOS_FS * fs)
 {
     struct boot_sector b;
@@ -576,12 +641,23 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 
 	fs_read(0, sizeof(b16), &b16);
 	if (b16.extended_sig != 0x29) {
+	    if (!check_boot_code((const unsigned char *)&b16,
+				 offsetof(struct boot_sector_16, junk)))
+		die("boot sector is executable, refusing to overwrite its boot code");
+
+	    if (rw)
+		fprintf(stderr, "Warning: boot sector has no FAT%d EBPB, creating one\n", fs->fat_bits);
+
 	    b16.extended_sig = 0x29;
 	    b16.serial = 0;
 	    memmove(b16.label, "NO NAME    ", 11);
 	    memmove(b16.fs_type, fs->fat_bits == 12 ? "FAT12   " : "FAT16   ",
 		    8);
-	}
+	} else if (!check_boot_code((const unsigned char *)&b16,
+				    label_mode
+					? offsetof(struct boot_sector_16, fs_type)
+					: offsetof(struct boot_sector_16, label)))
+	    die("boot sector is executable, refusing to overwrite its boot code");
 
 	if (label_mode)
 	    memmove(b16.label, label, 11);
@@ -594,11 +670,22 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 
 	fs_read(0, sizeof(b), &b);
 	if (b.extended_sig != 0x29) {
+	    if (!check_boot_code((const unsigned char *)&b,
+				 offsetof(struct boot_sector, junk)))
+		die("boot sector is executable, refusing to overwrite its boot code");
+
+	    if (rw)
+		fprintf(stderr, "Warning: boot sector has no FAT32 EBPB, creating one\n");
+
 	    b.extended_sig = 0x29;
 	    b.serial = 0;
 	    memmove(b.label, "NO NAME    ", 11);
 	    memmove(b.fs_type, "FAT32   ", 8);
-	}
+	} else if (!check_boot_code((const unsigned char *)&b,
+				    label_mode
+					? offsetof(struct boot_sector, fs_type)
+					: offsetof(struct boot_sector, label)))
+	    die("boot sector is executable, refusing to overwrite its boot code");
 
 	if (label_mode)
 	    memmove(b.label, label, 11);
