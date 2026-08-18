@@ -700,6 +700,11 @@ static void setup_tables(void)
     int ret;
     int i;
 
+    if (gemdos_semantics && size_fat == 32) {
+	fprintf(stderr, "Warning: FAT32 implies the standard variant\n");
+	gemdos_semantics = 0;
+    }
+
     memcpy((char *)bs.system_id, "mkfs.fat", strlen("mkfs.fat"));
     if (sectors_per_cluster)
 	bs.cluster_size = (char)sectors_per_cluster;
@@ -1025,11 +1030,9 @@ static void setup_tables(void)
 		printf("ss=%d: #clu=%d, fat_len=%d, maxclu=%d\n",
 		       sector_size, clusters, fat_length, maxclust);
 
-	    /* last 10 cluster numbers are special (except FAT32: 4 high bits rsvd);
-	     * first two numbers are reserved */
-	    if (maxclust <=
-		(size_fat == 32 ? MAX_CLUST_32 : (1 << size_fat) - 0x10)
-		&& clusters <= maxclust - 2)
+	    /* last 10 cluster numbers are special; first two numbers are
+	     * reserved (size_fat is always 12 or 16 here) */
+	    if (maxclust <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2)
 		break;
 	    if (verbose >= 2)
 		printf(clusters > maxclust - 2 ?
@@ -1047,15 +1050,9 @@ static void setup_tables(void)
 	    die("Would need a sector size > 16k, which GEMDOS can't work with");
 
 	cluster_count = clusters;
-	if (size_fat != 32)
-	    bs.fat_length = htole16(fat_length);
-	else {
-	    bs.fat_length = 0;
-	    bs.fat32.fat32_length = htole32(fat_length);
-	}
-	if (size_fat != 32)
-	    memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
-		   MSDOS_FAT16_SIGN, 8);
+	bs.fat_length = htole16(fat_length);
+	memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
+	       MSDOS_FAT16_SIGN, 8);
 	if (size_fat == 12) {
 	    /* TOS reads a little-endian 24-bit serial number at offset 8 (the
 	     * tail of the OEM field) to detect floppy media change; make it
