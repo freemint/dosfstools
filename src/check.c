@@ -26,6 +26,7 @@
 /* FAT32, VFAT, Atari format support, and various fixes additions May 1998
  * by Roman Hodek <Roman.Hodek@informatik.uni-erlangen.de> */
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1049,13 +1050,19 @@ void check_dirty_bits(DOS_FS * fs)
     if (fs->fat_bits == 32) {
 	struct boot_sector b32;
 	FAT_ENTRY fat32_flags;
+	int boot_dirty;
 
 	get_fat(&fat32_flags, fs->fat, 1, fs);
 	fs_read(0, sizeof(b32), &b32);
+	/* the dirty bit is an extended BPB field; where boot code reaches that
+	 * far, the byte is code and neither says anything nor may be written */
+	boot_dirty = (b32.boot_flags & FAT_STATE_DIRTY) &&
+	    check_boot_code((const unsigned char *)&b32,
+			    offsetof(struct boot_sector, extended_sig));
 
-	if ((b32.boot_flags & FAT_STATE_DIRTY) || !(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
+	if (boot_dirty || !(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
 	    if (print_fat_dirty_state() == 1) {
-		if (b32.boot_flags & FAT_STATE_DIRTY) {
+		if (boot_dirty) {
 		    b32.boot_flags &= ~FAT_STATE_DIRTY;
 		    fs_write(0, sizeof(b32), &b32);
 		}
@@ -1072,6 +1079,7 @@ void check_dirty_bits(DOS_FS * fs)
 	struct boot_sector_16 b16;
 	FAT_ENTRY fat16_flags;
 	int fat16_is_dirty = 0;
+	int boot_dirty;
 
 	fs_read(0, sizeof(b16), &b16);
 
@@ -1080,9 +1088,13 @@ void check_dirty_bits(DOS_FS * fs)
 	    fat16_is_dirty = !(fat16_flags.value & FAT16_FLAG_CLEAN_SHUTDOWN);
 	}
 
-	if ((b16.boot_flags & FAT_STATE_DIRTY) || fat16_is_dirty) {
+	boot_dirty = (b16.boot_flags & FAT_STATE_DIRTY) &&
+	    check_boot_code((const unsigned char *)&b16,
+			    offsetof(struct boot_sector_16, extended_sig));
+
+	if (boot_dirty || fat16_is_dirty) {
 	    if (print_fat_dirty_state() == 1) {
-		if (b16.boot_flags & FAT_STATE_DIRTY) {
+		if (boot_dirty) {
 		    b16.boot_flags &= ~FAT_STATE_DIRTY;
 		    fs_write(0, sizeof(b16), &b16);
 		}
