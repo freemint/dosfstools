@@ -323,7 +323,7 @@ static void check_backup_boot(DOS_FS * fs, struct boot_sector *b, unsigned int l
 	    fs_write(fs->backupboot_start, sizeof(*b), b);
 	    break;
 	case 2:
-	    fs_write(0, sizeof(b2), &b2);
+	    write_boot((unsigned char *)&b2);
 	    break;
 	default:
 	    break;
@@ -430,6 +430,50 @@ static int is_atari_bootable(const unsigned char *sec)
 	return atari_boot_flags(sec) >= 0;
 }
 
+/* Re-adjust the checksum word at offset 0x1FE so the 256 big-endian words sum
+ * to 'target', keeping a bootable Atari boot sector executable after an edit.
+ * (The DOS 0x55AA signature is fixed and is never recomputed.) */
+static void fix_atari_boot_checksum(unsigned char *sec, unsigned target)
+{
+	unsigned ck = (((unsigned)sec[0x1fe] << 8) | sec[0x1ff])
+		+ target - read_atari_boot_checksum(sec);
+
+	sec[0x1fe] = (ck >> 8) & 0xff;
+	sec[0x1ff] = ck & 0xff;
+}
+
+/* Write a rebuilt 512-byte boot sector back at LBA 0, keeping a TOS-bootable
+ * sector executable. A DOS boot signature occupies the same two bytes as the
+ * checksum, so when both are present one has to give: a 68k BRA at byte 0 (never
+ * a valid x86 boot jump) decides for the checksum, otherwise the signature wins
+ * and the sector merely summed to 0x1234 by chance. */
+void write_boot(unsigned char *sec)
+{
+	unsigned char orig[512];
+	int flags;
+
+	fs_read(0, sizeof(orig), orig);
+	flags = atari_boot_flags(orig);
+	if (flags >= 0 &&
+		(orig[0] == 0x60 || !(orig[0x1fe] == 0x55 && orig[0x1ff] == 0xaa))) {
+		/* if Linux's flag raised the sum, keep it raised while the flag is
+		 * set: clearing the flag later then brings it back to 0x1234 */
+		fix_atari_boot_checksum(sec, 0x1234 + (flags & sec[0x25]));
+		if (rw && orig[0x1fe] == 0x55 && orig[0x1ff] == 0xaa &&
+			!(sec[0x1fe] == 0x55 && sec[0x1ff] == 0xaa))
+			fprintf(stderr, "Warning: the DOS boot signature 0x55AA is replaced "
+				"by the Atari boot checksum\n");
+	} else if (read_atari_boot_checksum(sec) == 0x1234) {
+		/* the edit made the sector executable by chance; byte 8 is part of
+		 * the OEM name, where TOS keeps the serial number of a floppy */
+		sec[8] ^= 1;
+		if (rw)
+			fprintf(stderr, "Warning: OEM name changed, otherwise TOS would "
+				"execute the boot sector\n");
+	}
+	fs_write(0, 512, sec);
+}
+
 /* Decode the jump at byte 0 and return the offset where executable boot code
  * begins, or -1 if the first byte is not a recognised jump. Covers the x86
  * jumps used by DOS and the 68k BRA.S/BRA.W used by Atari TOS. */
@@ -493,6 +537,16 @@ int boot_is_dirty(const unsigned char *sec, int fat32)
 		return 1;
 	flags = atari_boot_flags(sec);
 	return sec[0] == 0x60 && flags >= 0 && (flags & FAT_STATE_DIRTY);
+}
+
+/* The flags of a FAT12/16 boot sector to clear along with the dirty flag. A
+ * surface-test flag set on a bootable Atari sector after its checksum goes as
+ * well: TOS executes the sector only once the sum is back at 0x1234. */
+unsigned boot_dirty_flags(const unsigned char *sec)
+{
+	int flags = atari_boot_flags(sec);
+
+	return FAT_STATE_DIRTY | (flags > 0 ? flags : 0);
 }
 
 void read_boot(DOS_FS * fs)
@@ -686,7 +740,7 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	else
 	    b16.serial = serial;
 
-	fs_write(0, sizeof(b16), &b16);
+	write_boot((unsigned char *)&b16);
     } else if (fs->fat_bits == 32) {
 	struct boot_sector b;
 
@@ -714,7 +768,7 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	else
 	    b.serial = serial;
 
-	fs_write(0, sizeof(b), &b);
+	write_boot((unsigned char *)&b);
 	if (fs->backupboot_start)
 	    fs_write(fs->backupboot_start, sizeof(b), &b);
     }

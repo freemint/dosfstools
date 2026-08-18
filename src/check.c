@@ -1052,7 +1052,7 @@ void check_dirty_bits(DOS_FS * fs)
 	    if (print_fat_dirty_state() == 1) {
 		if (boot_dirty) {
 		    b32.boot_flags &= ~FAT_STATE_DIRTY;
-		    fs_write(0, sizeof(b32), &b32);
+		    write_boot((unsigned char *)&b32);
 		}
 		if (!(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
 		    uint32_t *new_flags_ptr = (uint32_t *)(fs->fat + 4);
@@ -1081,8 +1081,8 @@ void check_dirty_bits(DOS_FS * fs)
 	if (boot_dirty || fat16_is_dirty) {
 	    if (print_fat_dirty_state() == 1) {
 		if (boot_dirty) {
-		    b16.boot_flags &= ~FAT_STATE_DIRTY;
-		    fs_write(0, sizeof(b16), &b16);
+		    b16.boot_flags &= ~boot_dirty_flags((const unsigned char *)&b16);
+		    write_boot((unsigned char *)&b16);
 		}
 		if (fat16_is_dirty) {
 		    uint16_t *new_flags_ptr = (uint16_t *)(fs->fat + 2);
