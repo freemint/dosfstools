@@ -640,7 +640,8 @@ static void establish_params(struct device_info *info)
 	}
     }
 
-    if (!size_fat && info->size >= 512 * 1024 * 1024) {
+    /* GEMDOS cannot read FAT32, so -A grows FAT16 by scaling sectors instead */
+    if (!size_fat && !gemdos_semantics && info->size >= 512 * 1024 * 1024) {
 	if (verbose)
 	    printf("Auto-selecting FAT32 for large filesystem\n");
 	size_fat = 32;
@@ -806,7 +807,8 @@ static void setup_tables(void)
         num_sectors = num_sectors / le16toh(bs.secs_track) * le16toh(bs.secs_track);
     }
 
-    if (!gemdos_semantics) {
+    /* FAT32 keeps the standard layout in either variant */
+    if (!gemdos_semantics || size_fat == 32) {
 	unsigned fatdata1216;	/* Sectors for FATs + data area (FAT12/16) */
 	unsigned fatdata32;	/* Sectors for FATs + data area (FAT32) */
 	unsigned fatlength12, fatlength16, fatlength32;
@@ -1026,11 +1028,9 @@ static void setup_tables(void)
 		printf("ss=%d: #clu=%d, fat_len=%d, maxclu=%d\n",
 		       sector_size, clusters, fat_length, maxclust);
 
-	    /* last 10 cluster numbers are special (except FAT32: 4 high bits rsvd);
-	     * first two numbers are reserved */
-	    if (maxclust <=
-		(size_fat == 32 ? MAX_CLUST_32 : (1 << size_fat) - 0x10)
-		&& clusters <= maxclust - 2)
+	    /* last 10 cluster numbers are special; first two numbers are
+	     * reserved (size_fat is always 12 or 16 here) */
+	    if (maxclust <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2)
 		break;
 	    if (verbose >= 2)
 		printf(clusters > maxclust - 2 ?
@@ -1045,18 +1045,13 @@ static void setup_tables(void)
 	} while (sector_size <= GEMDOS_MAX_SECTOR_SIZE);
 
 	if (sector_size > GEMDOS_MAX_SECTOR_SIZE)
-	    die("Would need a sector size > 16k, which GEMDOS can't work with");
+	    die("Would need a sector size > 16k, which GEMDOS can't work with; "
+		"a larger filesystem needs -F 32");
 
 	cluster_count = clusters;
-	if (size_fat != 32)
-	    bs.fat_length = htole16(fat_length);
-	else {
-	    bs.fat_length = 0;
-	    bs.fat32.fat32_length = htole32(fat_length);
-	}
-	if (size_fat != 32)
-	    memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
-		   MSDOS_FAT16_SIGN, 8);
+	bs.fat_length = htole16(fat_length);
+	memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
+	       MSDOS_FAT16_SIGN, 8);
 	if (size_fat == 12) {
 	    /* TOS reads a little-endian 24-bit serial number at offset 8 (the
 	     * tail of the OEM field) to detect floppy media change; make it
@@ -1193,10 +1188,11 @@ static void setup_tables(void)
 	memset(&bs.fat32.reserved2, 0, sizeof(bs.fat32.reserved2));
     }
 
-    if (gemdos_semantics) {
+    if (gemdos_semantics && size_fat != 32) {
 	/* Just some consistency checks */
 	if (num_sectors >= GEMDOS_MAX_SECTORS)
-	    die("GEMDOS can't handle more than 65531 sectors");
+	    die("GEMDOS can't handle more than 65531 sectors; use a larger "
+		"sector size, or -F 32");
 	else if (num_sectors >= OLDGEMDOS_MAX_SECTORS)
 	    printf("Warning: More than 32765 sector need TOS 1.04 "
 		   "or higher.\n");
