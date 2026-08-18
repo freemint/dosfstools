@@ -245,8 +245,7 @@ int main(int argc, char **argv)
 	reclaim_file(&fs);
     else
 	reclaim_free(&fs);
-    if (!atari_boot_layout)
-	check_dirty_bits(&fs);
+    check_dirty_bits(&fs);
     free_clusters = update_free(&fs);
     file_unused();
     qfree(&mem_queue);
@@ -257,8 +256,7 @@ int main(int argc, char **argv)
 	scan_root(&fs);
 	check_label(&fs);
 	reclaim_free(&fs);
-	if (!atari_boot_layout)
-	    check_dirty_bits(&fs);
+	check_dirty_bits(&fs);
 	qfree(&mem_queue);
     }
     release_fat(&fs);

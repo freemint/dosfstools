@@ -42,7 +42,6 @@
 
 int interactive;
 int write_immed;
-int atari_boot_layout;
 int gemdos_semantics;
 const char *program_name;
 
@@ -322,6 +321,18 @@ uint32_t generate_volume_id(void)
 
     /* volume ID = current time, fudged for more uniqueness */
     return ((uint32_t)now.tv_sec << 20) | (uint32_t)now.tv_usec;
+}
+
+/* Sum of all 256 big-endian words of a 512-byte boot sector. An Atari boot
+ * sector is executable by TOS only when this sum equals 0x1234. */
+unsigned read_atari_boot_checksum(const unsigned char *sec)
+{
+    unsigned sum = 0;
+    int i;
+
+    for (i = 0; i < 512; i += 2)
+	sum += ((unsigned)sec[i] << 8) | sec[i + 1];
+    return sum & 0xffff;
 }
 
 /*
