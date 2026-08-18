@@ -32,6 +32,8 @@ void write_boot_label(DOS_FS * fs, const char *label);
 void write_volume_label(DOS_FS * fs, char *label);
 void remove_label(DOS_FS *fs);
 void write_serial(DOS_FS * fs, uint32_t serial);
+int check_boot_code(const unsigned char *sec, int end);
+int boot_is_dirty(const unsigned char *sec, int fat32);
 off_t find_volume_de(DOS_FS * fs, DIR_ENT * de);
 const char *pretty_label(const char *label, char rep);
 

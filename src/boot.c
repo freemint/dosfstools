@@ -408,6 +408,93 @@ static void read_fsinfo(DOS_FS * fs, struct boot_sector *b, unsigned int lss)
 	fs->free_clusters = le32toh(i.free_clusters);
 }
 
+/* TOS executes a boot sector whose 256 big-endian words sum to 0x1234. Linux
+ * and Windows set the dirty and surface-test flags of a FAT12/16 boot sector
+ * (the byte at 0x25) without adjusting the sum. Return the flags set that way
+ * on a bootable sector, or -1 if the sector is not bootable. */
+static int atari_boot_flags(const unsigned char *sec)
+{
+	unsigned d = (read_atari_boot_checksum(sec) - 0x1234) & 0xffff;
+
+	/* TOS cannot read FAT32, so such a sector never holds Atari boot code */
+	if (!sec[0x16] && !sec[0x17])
+		return -1;
+	/* a flag that was clear raises the sum by its own value */
+	if (d > 3 || (d & ~sec[0x25]))
+		return -1;
+	return d;
+}
+
+static int is_atari_bootable(const unsigned char *sec)
+{
+	return atari_boot_flags(sec) >= 0;
+}
+
+/* Decode the jump at byte 0 and return the offset where executable boot code
+ * begins, or -1 if the first byte is not a recognised jump. Covers the x86
+ * jumps used by DOS and the 68k BRA.S/BRA.W used by Atari TOS. */
+static int boot_code_start(const unsigned char *sec)
+{
+	switch (sec[0]) {
+	/* 68k BRA */
+	case 0x60:
+		if (sec[1] == 0x00) {
+			/* BRA.W (4 bytes, big-endian) */
+			return 2 + (short)((sec[2] << 8) | sec[3]);
+		} else {
+			/* BRA.S (2 bytes) */
+			return 2 + (signed char)sec[1];
+		}
+	/* x86 JMP rel8 (2 bytes), usually + NOP */
+	case 0xeb:
+		return 2 + (signed char)sec[1];
+	/* x86 JMP rel16 (3 bytes, little-endian) */
+	case 0xe9:
+		return 3 + (short)(sec[1] | (sec[2] << 8));
+	/* NOP + x86 JMP rel8 (DR-DOS): 90 EB disp */
+	case 0x90:
+		if (sec[1] == 0xeb)
+			return 3 + (signed char)sec[2];
+		return -1;
+	/* unrecognised first byte */
+	default:
+		return -1;
+	}
+}
+
+/* Return 0 when the boot sector is executable (DOS 0x55AA signature or Atari
+ * 0x1234 checksum) and overwriting its bytes below 'end' could corrupt the
+ * boot code: the code either provably starts below 'end' or its entry point
+ * cannot be decoded. Return 1 when the write is safe. */
+int check_boot_code(const unsigned char *sec, int end)
+{
+	if ((sec[0x1fe] == 0x55 && sec[0x1ff] == 0xaa) ||
+		is_atari_bootable(sec)) {
+		/* an undecodable entry point (-1) fails the test, too */
+		if (boot_code_start(sec) < end)
+			return 0;
+	}
+	return 1;
+}
+
+/* Whether the dirty flag of a boot sector is set. Where boot code covers the
+ * flag byte, the flag counts only when it was evidently set on a bootable Atari
+ * sector after its checksum, which then sums to 0x1234 plus the flags. */
+int boot_is_dirty(const unsigned char *sec, int fat32)
+{
+	int flags;
+
+	if (fat32)
+		return (sec[offsetof(struct boot_sector, boot_flags)] & FAT_STATE_DIRTY) &&
+			check_boot_code(sec, offsetof(struct boot_sector, extended_sig));
+	if (!(sec[offsetof(struct boot_sector_16, boot_flags)] & FAT_STATE_DIRTY))
+		return 0;
+	if (check_boot_code(sec, offsetof(struct boot_sector_16, extended_sig)))
+		return 1;
+	flags = atari_boot_flags(sec);
+	return sec[0] == 0x60 && flags >= 0 && (flags & FAT_STATE_DIRTY);
+}
+
 void read_boot(DOS_FS * fs)
 {
     struct boot_sector b;
@@ -576,12 +663,23 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 
 	fs_read(0, sizeof(b16), &b16);
 	if (b16.extended_sig != 0x29) {
+	    if (!check_boot_code((const unsigned char *)&b16,
+				 offsetof(struct boot_sector_16, junk)))
+		die("boot sector is executable, refusing to overwrite its boot code");
+
+	    if (rw)
+		fprintf(stderr, "Warning: boot sector has no FAT%d EBPB, creating one\n", fs->fat_bits);
+
 	    b16.extended_sig = 0x29;
 	    b16.serial = 0;
 	    memmove(b16.label, "NO NAME    ", 11);
 	    memmove(b16.fs_type, fs->fat_bits == 12 ? "FAT12   " : "FAT16   ",
 		    8);
-	}
+	} else if (!check_boot_code((const unsigned char *)&b16,
+				    label_mode
+					? offsetof(struct boot_sector_16, fs_type)
+					: offsetof(struct boot_sector_16, label)))
+	    die("boot sector is executable, refusing to overwrite its boot code");
 
 	if (label_mode)
 	    memmove(b16.label, label, 11);
@@ -594,11 +692,22 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 
 	fs_read(0, sizeof(b), &b);
 	if (b.extended_sig != 0x29) {
+	    if (!check_boot_code((const unsigned char *)&b,
+				 offsetof(struct boot_sector, junk)))
+		die("boot sector is executable, refusing to overwrite its boot code");
+
+	    if (rw)
+		fprintf(stderr, "Warning: boot sector has no FAT32 EBPB, creating one\n");
+
 	    b.extended_sig = 0x29;
 	    b.serial = 0;
 	    memmove(b.label, "NO NAME    ", 11);
 	    memmove(b.fs_type, "FAT32   ", 8);
-	}
+	} else if (!check_boot_code((const unsigned char *)&b,
+				    label_mode
+					? offsetof(struct boot_sector, fs_type)
+					: offsetof(struct boot_sector, label)))
+	    die("boot sector is executable, refusing to overwrite its boot code");
 
 	if (label_mode)
 	    memmove(b.label, label, 11);
