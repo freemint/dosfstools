@@ -320,7 +320,7 @@ static void check_backup_boot(DOS_FS * fs, struct boot_sector *b, unsigned int l
 	    fs_write(fs->backupboot_start, sizeof(*b), b);
 	    break;
 	case 2:
-	    fs_write(0, sizeof(b2), &b2);
+	    write_boot((unsigned char *)&b2);
 	    break;
 	default:
 	    break;
@@ -412,6 +412,46 @@ static int is_atari_bootable(const unsigned char *sec)
 	if (!sec[0x16] && !sec[0x17])
 		return 0;
 	return read_atari_boot_checksum(sec) == 0x1234;
+}
+
+/* Re-adjust the checksum word at offset 0x1FE so the 256 big-endian words sum
+ * to 0x1234, keeping a bootable Atari boot sector executable after an edit.
+ * (The DOS 0x55AA signature is fixed and is never recomputed.) */
+static void fix_atari_boot_checksum(unsigned char *sec)
+{
+	unsigned ck = (((unsigned)sec[0x1fe] << 8) | sec[0x1ff])
+		+ 0x1234 - read_atari_boot_checksum(sec);
+
+	sec[0x1fe] = (ck >> 8) & 0xff;
+	sec[0x1ff] = ck & 0xff;
+}
+
+/* Write a rebuilt 512-byte boot sector back at LBA 0, keeping a TOS-bootable
+ * sector executable. A DOS boot signature occupies the same two bytes as the
+ * checksum, so when both are present one has to give: a 68k BRA at byte 0 (never
+ * a valid x86 boot jump) decides for the checksum, otherwise the signature wins
+ * and the sector merely summed to 0x1234 by chance. */
+void write_boot(unsigned char *sec)
+{
+	unsigned char orig[512];
+
+	fs_read(0, sizeof(orig), orig);
+	if (is_atari_bootable(orig) &&
+		(orig[0] == 0x60 || !(orig[0x1fe] == 0x55 && orig[0x1ff] == 0xaa))) {
+		fix_atari_boot_checksum(sec);
+		if (rw && orig[0x1fe] == 0x55 && orig[0x1ff] == 0xaa &&
+			!(sec[0x1fe] == 0x55 && sec[0x1ff] == 0xaa))
+			fprintf(stderr, "Warning: the DOS boot signature 0x55AA is replaced "
+				"by the Atari boot checksum\n");
+	} else if (gemdos_semantics && read_atari_boot_checksum(sec) == 0x1234) {
+		/* the edit made the sector executable by chance; byte 8 is part of
+		 * the OEM name */
+		sec[8] ^= 1;
+		if (rw)
+			fprintf(stderr, "Warning: OEM name changed, otherwise TOS would "
+				"execute the boot sector\n");
+	}
+	fs_write(0, 512, sec);
 }
 
 /* Decode the jump at byte 0 and return the offset where executable boot code
@@ -655,7 +695,7 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	else
 	    b16.serial = serial;
 
-	fs_write(0, sizeof(b16), &b16);
+	write_boot((unsigned char *)&b16);
     } else if (fs->fat_bits == 32) {
 	struct boot_sector b;
 
@@ -683,7 +723,7 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	else
 	    b.serial = serial;
 
-	fs_write(0, sizeof(b), &b);
+	write_boot((unsigned char *)&b);
 	if (fs->backupboot_start)
 	    fs_write(fs->backupboot_start, sizeof(b), &b);
     }
