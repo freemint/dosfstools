@@ -145,7 +145,7 @@ static char *file_stat(DOS_FILE * file)
 static int bad_name(DOS_FILE * file)
 {
     int i, spc;
-    const char *bad_chars = atari_format ? "*?\\/:" : "*?<>|\"\\/:.";
+    const char *bad_chars = gemdos_semantics ? "*?\\/:" : "*?<>|\"\\/:.";
     const unsigned char *name = file->dir_ent.name;
     const unsigned char *ext = name + 8;
 
@@ -1034,18 +1034,23 @@ static char print_fat_dirty_state(void)
 		      2, "No action");
 }
 
+/* Under GEMDOS rules the dirty flag in the boot sector is left alone: only
+ * Linux and Windows set it, and where TOS boot code reaches that far, the byte
+ * is code. */
 void check_dirty_bits(DOS_FS * fs)
 {
     if (fs->fat_bits == 32) {
 	struct boot_sector b32;
 	FAT_ENTRY fat32_flags;
+	int boot_dirty;
 
 	get_fat(&fat32_flags, fs->fat, 1, fs);
 	fs_read(0, sizeof(b32), &b32);
+	boot_dirty = !gemdos_semantics && (b32.boot_flags & FAT_STATE_DIRTY);
 
-	if ((b32.boot_flags & FAT_STATE_DIRTY) || !(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
+	if (boot_dirty || !(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
 	    if (print_fat_dirty_state() == 1) {
-		if (b32.boot_flags & FAT_STATE_DIRTY) {
+		if (boot_dirty) {
 		    b32.boot_flags &= ~FAT_STATE_DIRTY;
 		    fs_write(0, sizeof(b32), &b32);
 		}
@@ -1062,17 +1067,19 @@ void check_dirty_bits(DOS_FS * fs)
 	struct boot_sector_16 b16;
 	FAT_ENTRY fat16_flags;
 	int fat16_is_dirty = 0;
+	int boot_dirty;
 
 	fs_read(0, sizeof(b16), &b16);
+	boot_dirty = !gemdos_semantics && (b16.boot_flags & FAT_STATE_DIRTY);
 
 	if (fs->fat_bits == 16) {
 	    get_fat(&fat16_flags, fs->fat, 1, fs);
 	    fat16_is_dirty = !(fat16_flags.value & FAT16_FLAG_CLEAN_SHUTDOWN);
 	}
 
-	if ((b16.boot_flags & FAT_STATE_DIRTY) || fat16_is_dirty) {
+	if (boot_dirty || fat16_is_dirty) {
 	    if (print_fat_dirty_state() == 1) {
-		if (b16.boot_flags & FAT_STATE_DIRTY) {
+		if (boot_dirty) {
 		    b16.boot_flags &= ~FAT_STATE_DIRTY;
 		    fs_write(0, sizeof(b16), &b16);
 		}

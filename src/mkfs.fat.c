@@ -97,7 +97,7 @@ static inline int cdiv(int a, int b)
 }
 
 /* FAT values */
-#define FAT_EOF      (atari_format ? 0x0fffffff : 0x0ffffff8)
+#define FAT_EOF      (gemdos_semantics ? 0x0fffffff : 0x0ffffff8)
 #define FAT_BAD      0x0ffffff7
 
 #define MSDOS_EXT_SIGN 0x29	/* extended boot sector signature */
@@ -199,8 +199,6 @@ struct fat32_fsinfo {
 
 unsigned char dummy_boot_jump[3] = { 0xeb, 0x3c, 0x90 };
 
-unsigned char dummy_boot_jump_m68k[2] = { 0x60, 0x1c };
-
 #define MSG_OFFSET_OFFSET 3
 char dummy_boot_code[BOOTCODE_SIZE] = "\x0e"	/* push cs */
     "\x1f"			/* pop ds */
@@ -234,6 +232,7 @@ static char *device_name = NULL;	/* Name of the device on which to create the fi
 static int check = FALSE;	/* Default to no readablity checking */
 static int verbose = 0;		/* Default to verbose mode off */
 static long volume_id;		/* Volume ID number */
+static int volume_id_by_user = 0;	/* 1 if volume ID user selected */
 static time_t create_time = -1;	/* Creation time */
 static char *volume_name = initial_volume_name;	/* Volume name */
 static unsigned long long blocks;	/* Number of blocks in filesystem */
@@ -619,7 +618,7 @@ static void establish_params(struct device_info *info)
 		sec_per_track = 15;
 		heads = 2;
 		media = 0xf9;
-		cluster_size = (atari_format ? 2 : 1);
+		cluster_size = (gemdos_semantics ? 2 : 1);
 		def_root_dir_entries = 224;
 		break;
 
@@ -627,7 +626,7 @@ static void establish_params(struct device_info *info)
 		sec_per_track = 18;
 		heads = 2;
 		media = 0xf0;
-		cluster_size = (atari_format ? 2 : 1);
+		cluster_size = (gemdos_semantics ? 2 : 1);
 		def_root_dir_entries = 224;
 		break;
 
@@ -702,14 +701,7 @@ static void setup_tables(void)
     int ret;
     int i;
 
-    if (atari_format) {
-	/* On Atari, the first few bytes of the boot sector are assigned
-	 * differently: The jump code is only 2 bytes (and m68k machine code
-	 * :-), then 6 bytes filler (ignored), then 3 byte serial number. */
-	bs.boot_jump[2] = 'm';
-	memcpy((char *)bs.system_id, "kdosf", strlen("kdosf"));
-    } else
-	memcpy((char *)bs.system_id, "mkfs.fat", strlen("mkfs.fat"));
+    memcpy((char *)bs.system_id, "mkfs.fat", strlen("mkfs.fat"));
     if (sectors_per_cluster)
 	bs.cluster_size = (char)sectors_per_cluster;
 
@@ -732,16 +724,10 @@ static void setup_tables(void)
 	root_dir_entries = 0;
     }
 
-    if (atari_format) {
-	bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
-	bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
-	bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
-    } else {
-	vi->volume_id[0] = (unsigned char)(volume_id & 0x000000ff);
-	vi->volume_id[1] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
-	vi->volume_id[2] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
-	vi->volume_id[3] = (unsigned char)(volume_id >> 24);
-    }
+    vi->volume_id[0] = (unsigned char)(volume_id & 0x000000ff);
+    vi->volume_id[1] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
+    vi->volume_id[2] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
+    vi->volume_id[3] = (unsigned char)(volume_id >> 24);
 
     len = mbstowcs(NULL, volume_name, 0);
     if (len != (size_t)-1 && len > 11)
@@ -768,31 +754,27 @@ static void setup_tables(void)
     if (ret & 0x10)
 	die("Label can't start with a space character");
 
-    if (!atari_format) {
-	memcpy(vi->volume_label, label, 11);
+    memcpy(vi->volume_label, label, 11);
 
-	memcpy(bs.boot_jump, dummy_boot_jump, 3);
-	/* Patch in the correct offset to the boot code */
-	bs.boot_jump[1] = ((size_fat == 32 ?
-			    (char *)&bs.fat32.boot_code :
-			    (char *)&bs.oldfat.boot_code) - (char *)&bs) - 2;
+    memcpy(bs.boot_jump, dummy_boot_jump, 3);
+    /* Patch in the correct offset to the boot code */
+    bs.boot_jump[1] = ((size_fat == 32 ?
+			(char *)&bs.fat32.boot_code :
+			(char *)&bs.oldfat.boot_code) - (char *)&bs) - 2;
 
-	if (size_fat == 32) {
-	    int offset = (char *)&bs.fat32.boot_code -
-		(char *)&bs + MESSAGE_OFFSET + 0x7c00;
-	    if (dummy_boot_code[BOOTCODE_FAT32_SIZE - 1])
-		printf("Warning: message too long; truncated\n");
-	    dummy_boot_code[BOOTCODE_FAT32_SIZE - 1] = 0;
-	    memcpy(bs.fat32.boot_code, dummy_boot_code, BOOTCODE_FAT32_SIZE);
-	    bs.fat32.boot_code[MSG_OFFSET_OFFSET] = offset & 0xff;
-	    bs.fat32.boot_code[MSG_OFFSET_OFFSET + 1] = offset >> 8;
-	} else {
-	    memcpy(bs.oldfat.boot_code, dummy_boot_code, BOOTCODE_SIZE);
-	}
-	bs.boot_sign = htole16(BOOT_SIGN);
+    if (size_fat == 32) {
+	int offset = (char *)&bs.fat32.boot_code -
+	    (char *)&bs + MESSAGE_OFFSET + 0x7c00;
+	if (dummy_boot_code[BOOTCODE_FAT32_SIZE - 1])
+	    printf("Warning: message too long; truncated\n");
+	dummy_boot_code[BOOTCODE_FAT32_SIZE - 1] = 0;
+	memcpy(bs.fat32.boot_code, dummy_boot_code, BOOTCODE_FAT32_SIZE);
+	bs.fat32.boot_code[MSG_OFFSET_OFFSET] = offset & 0xff;
+	bs.fat32.boot_code[MSG_OFFSET_OFFSET + 1] = offset >> 8;
     } else {
-	memcpy(bs.boot_jump, dummy_boot_jump_m68k, 2);
+	memcpy(bs.oldfat.boot_code, dummy_boot_code, BOOTCODE_SIZE);
     }
+    bs.boot_sign = htole16(BOOT_SIGN);
     if (verbose >= 2)
 	printf("Boot jump code is %02x %02x\n",
 	       bs.boot_jump[0], bs.boot_jump[1]);
@@ -807,15 +789,7 @@ static void setup_tables(void)
     if (verbose >= 2)
 	printf("Using %d reserved sectors\n", reserved_sectors);
     bs.fats = (char)nr_fats;
-    if (!atari_format || size_fat == 32)
-	bs.hidden = htole32(hidden_sectors);
-    else {
-	/* In Atari format, hidden is a 16 bit field */
-	uint16_t hidden = htole16(hidden_sectors);
-	if (hidden_sectors & ~0xffff)
-	    die("#hidden doesn't fit in 16bit field of Atari format\n");
-	memcpy(&bs.hidden, &hidden, 2);
-    }
+    bs.hidden = htole32(hidden_sectors);
 
     if ((long long)(blocks * BLOCK_SIZE / sector_size) + orphaned_sectors >
 	    UINT32_MAX) {
@@ -832,7 +806,7 @@ static void setup_tables(void)
         num_sectors = num_sectors / le16toh(bs.secs_track) * le16toh(bs.secs_track);
     }
 
-    if (!atari_format) {
+    if (!gemdos_semantics) {
 	unsigned fatdata1216;	/* Sectors for FATs + data area (FAT12/16) */
 	unsigned fatdata32;	/* Sectors for FATs + data area (FAT32) */
 	unsigned fatlength12, fatlength16, fatlength32;
@@ -1080,6 +1054,17 @@ static void setup_tables(void)
 	    bs.fat_length = 0;
 	    bs.fat32.fat32_length = htole32(fat_length);
 	}
+	if (size_fat != 32)
+	    memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
+		   MSDOS_FAT16_SIGN, 8);
+	if (size_fat == 12) {
+	    /* TOS reads a little-endian 24-bit serial number at offset 8 (the
+	     * tail of the OEM field) to detect floppy media change; make it
+	     * unique per disk. DOS treats the OEM field as opaque text. */
+	    bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
+	    bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
+	    bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
+	}
     }
 
     if (fill_mbr_partition) {
@@ -1208,7 +1193,7 @@ static void setup_tables(void)
 	memset(&bs.fat32.reserved2, 0, sizeof(bs.fat32.reserved2));
     }
 
-    if (atari_format) {
+    if (gemdos_semantics) {
 	/* Just some consistency checks */
 	if (num_sectors >= GEMDOS_MAX_SECTORS)
 	    die("GEMDOS can't handle more than 65531 sectors");
@@ -1221,12 +1206,10 @@ static void setup_tables(void)
 	bs.total_sect = htole32(num_sectors);
     } else {
 	bs.sectors = htole16((uint16_t) num_sectors);
-	if (!atari_format)
-	    bs.total_sect = htole32(0);
+	bs.total_sect = htole32(0);
     }
 
-    if (!atari_format)
-	vi->ext_boot_sign = MSDOS_EXT_SIGN;
+    vi->ext_boot_sign = MSDOS_EXT_SIGN;
 
     if (!cluster_count) {
 	if (sectors_per_cluster)	/* If yes, die if we'd spec'd sectors per cluster */
@@ -1273,8 +1256,7 @@ static void setup_tables(void)
 	    printf("Root directory contains %u slots and uses %u sectors.\n",
 		   root_dir_entries, root_dir_sectors);
 	}
-	printf("Volume ID is %08lx, ", volume_id &
-	       (atari_format ? 0x00ffffff : 0xffffffff));
+	printf("Volume ID is %08lx, ", volume_id);
 	if (memcmp(label, NO_NAME, MSDOS_NAME))
 	    printf("volume label %s.\n", volume_name);
 	else
@@ -1441,6 +1423,23 @@ static void write_tables(void)
     fat_length = (size_fat == 32) ?
 	le32toh(bs.fat32.fat32_length) : le16toh(bs.fat_length);
 
+    /* the 0x55AA signature takes the checksum word, so change the serial
+     * instead, unless the user chose it */
+    if (read_atari_boot_checksum((const unsigned char *)&bs) == 0x1234) {
+	if (!volume_id_by_user) {
+	    volume_id ^= 1;
+	    (size_fat == 32 ? &bs.fat32.vi : &bs.oldfat.vi)->volume_id[0] ^= 1;
+	    fprintf(stderr, "Warning: volume ID changed to %08lx, otherwise TOS "
+		    "would execute the boot sector\n", volume_id);
+	} else if (gemdos_semantics) {
+	    if (!ignore_safety_checks)
+		die("Volume ID %08lx makes the boot sector executable by TOS; "
+		    "choose another, or use -I", volume_id);
+	    fprintf(stderr, "Warning: TOS will execute the boot sector, as its "
+		    "words sum to 0x1234\n");
+	}
+    }
+
     seekto(0, "start of device");
     /* clear all reserved sectors */
     for (x = 0; x < reserved_sectors; ++x)
@@ -1591,7 +1590,7 @@ int main(int argc, char **argv)
 	/* Scan the command line for options */
 	switch (c) {
 	case 'A':		/* toggle Atari format */
-	    atari_format = !atari_format;
+	    gemdos_semantics = !gemdos_semantics;
 	    break;
 
 	case 'a':		/* a : skip alignment */
@@ -1699,6 +1698,7 @@ int main(int argc, char **argv)
 	    }
 
 	    volume_id = conversion;
+	    volume_id_by_user = 1;
 	    break;
 
 	case 'l':		/* l : Bad block filename */
@@ -1851,6 +1851,7 @@ int main(int argc, char **argv)
 	case OPT_INVARIANT:
 	    invariant = 1;
 	    volume_id = 0x1234abcd;
+	    volume_id_by_user = 1;
 	    create_time = 1426325213;
 	    break;
 
@@ -1869,9 +1870,9 @@ int main(int argc, char **argv)
 
 	case OPT_VARIANT:
 	    if (!strcasecmp(optarg, "standard")) {
-		    atari_format = 0;
+		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
-		    atari_format = 1;
+		    gemdos_semantics = 1;
 	    } else {
 		    printf("Unknown variant: %s\n", optarg);
 		    usage(argv[0], 1);
