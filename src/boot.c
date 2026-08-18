@@ -549,6 +549,21 @@ unsigned boot_dirty_flags(const unsigned char *sec)
 	return FAT_STATE_DIRTY | (flags > 0 ? flags : 0);
 }
 
+static int detect_gemdos_semantics(const struct boot_sector *b)
+{
+	int fat32 = !b->fat_length && b->fat32_length;
+
+	/* Logical sector scaling is how TOS and HD Driver grow a partition past
+	 * the 16-bit sector count. GEMDOS cannot read FAT32 at all, so scaling
+	 * there says nothing about how the files were written. */
+	if (!fat32 && GET_UNALIGNED_W(b->sector_size) > 512)
+		return 1;
+
+	/* Don't return 0 here: let the caller decide implications
+	 * of a <32 MB and/or FAT32 partition.*/
+	return -1;
+}
+
 void read_boot(DOS_FS * fs)
 {
     struct boot_sector b;
@@ -617,6 +632,15 @@ void read_boot(DOS_FS * fs)
     fs->root_cluster = 0;	/* indicates standard, pre-FAT32 root dir */
     fs->fsinfo_start = 0;	/* no FSINFO structure */
     fs->free_clusters = -1;	/* unknown */
+
+    /* Must run before the FAT type is decided below: enabling GEMDOS rules
+     * changes the FAT12/16 selection. */
+    if (gemdos_semantics == -1) {
+	gemdos_semantics = detect_gemdos_semantics(&b);
+	if (gemdos_semantics == -1)
+	    gemdos_semantics = 0;
+    }
+
     if (!b.fat_length && b.fat32_length) {
 	fs->fat_bits = 32;
 	fs->root_cluster = le32toh(b.root_cluster);
