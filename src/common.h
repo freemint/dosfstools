@@ -34,10 +34,6 @@
 
 extern int interactive;
 extern int write_immed;
-/* Boot sector uses the Atari layout (as built by the TOS BIOS's Protobt()):
- * a DOS 3.0 BPB (16-bit hidden sectors, no DOS 3.31 large-total field, no
- * DOS 4.0 EBPB) plus a 24-bit serial number at offset 8. */
-extern int atari_boot_layout;
 /* Filesystem follows Atari GEMDOS rules rather than MS-DOS: filename
  * character set, FAT12/16 selection, special FAT values, cluster size and
  * sector-count limits. */

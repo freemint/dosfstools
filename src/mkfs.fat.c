@@ -199,8 +199,6 @@ struct fat32_fsinfo {
 
 unsigned char dummy_boot_jump[3] = { 0xeb, 0x3c, 0x90 };
 
-unsigned char dummy_boot_jump_m68k[2] = { 0x60, 0x1c };
-
 #define MSG_OFFSET_OFFSET 3
 char dummy_boot_code[BOOTCODE_SIZE] = "\x0e"	/* push cs */
     "\x1f"			/* pop ds */
@@ -702,14 +700,7 @@ static void setup_tables(void)
     int ret;
     int i;
 
-    if (atari_boot_layout) {
-	/* On Atari, the first few bytes of the boot sector are assigned
-	 * differently: The jump code is only 2 bytes (and m68k machine code
-	 * :-), then 6 bytes filler (ignored), then 3 byte serial number. */
-	bs.boot_jump[2] = 'm';
-	memcpy((char *)bs.system_id, "kdosf", strlen("kdosf"));
-    } else
-	memcpy((char *)bs.system_id, "mkfs.fat", strlen("mkfs.fat"));
+    memcpy((char *)bs.system_id, "mkfs.fat", strlen("mkfs.fat"));
     if (sectors_per_cluster)
 	bs.cluster_size = (char)sectors_per_cluster;
 
@@ -732,16 +723,10 @@ static void setup_tables(void)
 	root_dir_entries = 0;
     }
 
-    if (atari_boot_layout) {
-	bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
-	bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
-	bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
-    } else {
-	vi->volume_id[0] = (unsigned char)(volume_id & 0x000000ff);
-	vi->volume_id[1] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
-	vi->volume_id[2] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
-	vi->volume_id[3] = (unsigned char)(volume_id >> 24);
-    }
+    vi->volume_id[0] = (unsigned char)(volume_id & 0x000000ff);
+    vi->volume_id[1] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
+    vi->volume_id[2] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
+    vi->volume_id[3] = (unsigned char)(volume_id >> 24);
 
     len = mbstowcs(NULL, volume_name, 0);
     if (len != (size_t)-1 && len > 11)
@@ -768,31 +753,27 @@ static void setup_tables(void)
     if (ret & 0x10)
 	die("Label can't start with a space character");
 
-    if (!atari_boot_layout) {
-	memcpy(vi->volume_label, label, 11);
+    memcpy(vi->volume_label, label, 11);
 
-	memcpy(bs.boot_jump, dummy_boot_jump, 3);
-	/* Patch in the correct offset to the boot code */
-	bs.boot_jump[1] = ((size_fat == 32 ?
-			    (char *)&bs.fat32.boot_code :
-			    (char *)&bs.oldfat.boot_code) - (char *)&bs) - 2;
+    memcpy(bs.boot_jump, dummy_boot_jump, 3);
+    /* Patch in the correct offset to the boot code */
+    bs.boot_jump[1] = ((size_fat == 32 ?
+			(char *)&bs.fat32.boot_code :
+			(char *)&bs.oldfat.boot_code) - (char *)&bs) - 2;
 
-	if (size_fat == 32) {
-	    int offset = (char *)&bs.fat32.boot_code -
-		(char *)&bs + MESSAGE_OFFSET + 0x7c00;
-	    if (dummy_boot_code[BOOTCODE_FAT32_SIZE - 1])
-		printf("Warning: message too long; truncated\n");
-	    dummy_boot_code[BOOTCODE_FAT32_SIZE - 1] = 0;
-	    memcpy(bs.fat32.boot_code, dummy_boot_code, BOOTCODE_FAT32_SIZE);
-	    bs.fat32.boot_code[MSG_OFFSET_OFFSET] = offset & 0xff;
-	    bs.fat32.boot_code[MSG_OFFSET_OFFSET + 1] = offset >> 8;
-	} else {
-	    memcpy(bs.oldfat.boot_code, dummy_boot_code, BOOTCODE_SIZE);
-	}
-	bs.boot_sign = htole16(BOOT_SIGN);
+    if (size_fat == 32) {
+	int offset = (char *)&bs.fat32.boot_code -
+	    (char *)&bs + MESSAGE_OFFSET + 0x7c00;
+	if (dummy_boot_code[BOOTCODE_FAT32_SIZE - 1])
+	    printf("Warning: message too long; truncated\n");
+	dummy_boot_code[BOOTCODE_FAT32_SIZE - 1] = 0;
+	memcpy(bs.fat32.boot_code, dummy_boot_code, BOOTCODE_FAT32_SIZE);
+	bs.fat32.boot_code[MSG_OFFSET_OFFSET] = offset & 0xff;
+	bs.fat32.boot_code[MSG_OFFSET_OFFSET + 1] = offset >> 8;
     } else {
-	memcpy(bs.boot_jump, dummy_boot_jump_m68k, 2);
+	memcpy(bs.oldfat.boot_code, dummy_boot_code, BOOTCODE_SIZE);
     }
+    bs.boot_sign = htole16(BOOT_SIGN);
     if (verbose >= 2)
 	printf("Boot jump code is %02x %02x\n",
 	       bs.boot_jump[0], bs.boot_jump[1]);
@@ -807,15 +788,7 @@ static void setup_tables(void)
     if (verbose >= 2)
 	printf("Using %d reserved sectors\n", reserved_sectors);
     bs.fats = (char)nr_fats;
-    if (!atari_boot_layout || size_fat == 32)
-	bs.hidden = htole32(hidden_sectors);
-    else {
-	/* In Atari format, hidden is a 16 bit field */
-	uint16_t hidden = htole16(hidden_sectors);
-	if (hidden_sectors & ~0xffff)
-	    die("#hidden doesn't fit in 16bit field of Atari format\n");
-	memcpy(&bs.hidden, &hidden, 2);
-    }
+    bs.hidden = htole32(hidden_sectors);
 
     if ((long long)(blocks * BLOCK_SIZE / sector_size) + orphaned_sectors >
 	    UINT32_MAX) {
@@ -1080,9 +1053,17 @@ static void setup_tables(void)
 	    bs.fat_length = 0;
 	    bs.fat32.fat32_length = htole32(fat_length);
 	}
-	if (!atari_boot_layout && size_fat != 32)
+	if (size_fat != 32)
 	    memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
 		   MSDOS_FAT16_SIGN, 8);
+	if (size_fat == 12) {
+	    /* TOS reads a little-endian 24-bit serial number at offset 8 (the
+	     * tail of the OEM field) to detect floppy media change; make it
+	     * unique per disk. DOS treats the OEM field as opaque text. */
+	    bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
+	    bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
+	    bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
+	}
     }
 
     if (fill_mbr_partition) {
@@ -1224,12 +1205,10 @@ static void setup_tables(void)
 	bs.total_sect = htole32(num_sectors);
     } else {
 	bs.sectors = htole16((uint16_t) num_sectors);
-	if (!atari_boot_layout)
-	    bs.total_sect = htole32(0);
+	bs.total_sect = htole32(0);
     }
 
-    if (!atari_boot_layout)
-	vi->ext_boot_sign = MSDOS_EXT_SIGN;
+    vi->ext_boot_sign = MSDOS_EXT_SIGN;
 
     if (!cluster_count) {
 	if (sectors_per_cluster)	/* If yes, die if we'd spec'd sectors per cluster */
@@ -1276,8 +1255,7 @@ static void setup_tables(void)
 	    printf("Root directory contains %u slots and uses %u sectors.\n",
 		   root_dir_entries, root_dir_sectors);
 	}
-	printf("Volume ID is %08lx, ", volume_id &
-	       (atari_boot_layout ? 0x00ffffff : 0xffffffff));
+	printf("Volume ID is %08lx, ", volume_id);
 	if (memcmp(label, NO_NAME, MSDOS_NAME))
 	    printf("volume label %s.\n", volume_name);
 	else

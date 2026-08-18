@@ -213,20 +213,12 @@ static const char *get_media_descr(unsigned char media)
 static void dump_boot(DOS_FS * fs, struct boot_sector *b, unsigned lss)
 {
     unsigned short sectors;
+    char id[9];
 
     printf("Boot sector contents:\n");
-    if (!atari_boot_layout) {
-	char id[9];
-	strncpy(id, (const char *)b->system_id, 8);
-	id[8] = 0;
-	printf("System ID \"%s\"\n", id);
-    } else {
-	/* On Atari, a 24 bit serial number is stored at offset 8 of the boot
-	 * sector */
-	printf("Serial number 0x%x\n",
-	       b->system_id[5] | (b->system_id[6] << 8) | (b->
-							   system_id[7] << 16));
-    }
+    strncpy(id, (const char *)b->system_id, 8);
+    id[8] = 0;
+    printf("System ID \"%s\"\n", id);
     printf("Media byte 0x%02x (%s)\n", b->media, get_media_descr(b->media));
     printf("%10d bytes per logical sector\n", GET_UNALIGNED_W(b->sector_size));
     printf("%10d bytes per cluster\n", fs->cluster_size);
@@ -255,10 +247,7 @@ static void dump_boot(DOS_FS * fs, struct boot_sector *b, unsigned lss)
 	   (unsigned long long)fs->data_clusters * fs->cluster_size);
     printf("%u sectors/track, %u heads\n", le16toh(b->secs_track),
 	   le16toh(b->heads));
-    printf("%10u hidden sectors\n", atari_boot_layout ?
-	   /* On Atari, the hidden field is only 16 bit wide and unused */
-	   (((unsigned char *)&b->hidden)[0] |
-	    ((unsigned char *)&b->hidden)[1] << 8) : le32toh(b->hidden));
+    printf("%10u hidden sectors\n", le32toh(b->hidden));
     sectors = GET_UNALIGNED_W(b->sectors);
     printf("%10u sectors total\n", sectors ? sectors : le32toh(b->total_sect));
 }
@@ -569,8 +558,7 @@ void read_boot(DOS_FS * fs)
 	die("Logical sector size (%u bytes) is not a multiple of the physical "
 	    "sector size.", logical_sector_size);
 #if 0				/* linux kernel doesn't check that either */
-    /* ++roman: On Atari, these two fields are often left uninitialized */
-    if (!atari_boot_layout && (!b.secs_track || !b.heads))
+    if (!b.secs_track || !b.heads)
 	die("Invalid disk format in boot sector.");
 #endif
     if (verbose)

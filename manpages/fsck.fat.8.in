@@ -110,8 +110,7 @@ widely used on hard disks and removable media like USB sticks and SD cards.
 The other is the legacy Atari variant used on Atari ST.
 .PP
 There are some minor differences in Atari format:
-Some boot sector fields are interpreted slightly different, and the special FAT
-entries for end-of-file and bad cluster can be different.
+The special FAT entries for end-of-file and bad cluster can be different.
 Under MS-DOS 0xfff8 is used for EOF and Atari employs 0xffff by default, but
 both systems recognize all values from 0xfff8\(en0xffff as end-of-file.
 MS-DOS uses only 0xfff7 for bad clusters, where on Atari values 0xfff0\(en0xfff7

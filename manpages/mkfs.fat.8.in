@@ -50,12 +50,12 @@ always use 2 sectors per cluster, since GEMDOS doesn't like other values very
 much.
 It will also obey the maximum number of sectors GEMDOS can handle.
 Larger filesystems are managed by raising the logical sector size.
-An Atari-compatible serial number for the filesystem is generated, and a 12 bit
-FAT is used only for filesystems that have one of the usual floppy sizes (720k,
-1.2M, 1.44M, 2.88M), a 16 bit FAT otherwise.
+A 12 bit FAT is used only for filesystems that have one of the usual floppy
+sizes (720k, 1.2M, 1.44M, 2.88M), a 16 bit FAT otherwise.
 This can be overridden with the \fB\-F\fP option.
-Some PC-specific boot sector fields aren't written, and a boot message (option
-\fB\-m\fP) is ignored.
+The boot sector always uses the MS-DOS layout; on a 12 bit FAT an
+Atari-compatible 24 bit serial number is additionally stored at offset 8, so
+that TOS can detect a media change.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4

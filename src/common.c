@@ -42,7 +42,6 @@
 
 int interactive;
 int write_immed;
-int atari_boot_layout;
 int gemdos_semantics;
 const char *program_name;
 
