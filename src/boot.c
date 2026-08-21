@@ -583,7 +583,7 @@ void read_boot(DOS_FS * fs)
 #ifdef __MINT__
 	/* The XHDI partition ID says how TOS will mount the partition, so it
 	 * is asked before the boot sector; it returns -1 when it cannot tell. */
-	/* gemdos_semantics = fs_type(); */
+	gemdos_semantics = fs_type();
 	if (gemdos_semantics == -1)
 	    gemdos_semantics = detect_gemdos_semantics(&b);
 	if (gemdos_semantics == -1)

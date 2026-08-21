@@ -102,6 +102,23 @@ static void fix_first_cluster(DOS_FS * fs, void * first_cluster)
         *(uint32_t *)first_cluster = htole32(FAT_EXTD(fs) | b.media);
 }
 
+int fs_is_clean(DOS_FS * fs, FAT_ENTRY * flags)
+{
+    FAT_ENTRY local;
+
+    if (!flags)
+	flags = &local;
+    if (fs->fat_bits == 12) {
+	flags->value = 0;
+	flags->reserved = 0;
+	return 0;
+    }
+    get_fat(flags, fs->fat, 1, fs);
+    return fs->fat_bits == 32
+	? (flags->value & FAT32_FLAG_CLEAN_SHUTDOWN) != 0
+	: (flags->value & FAT16_FLAG_CLEAN_SHUTDOWN) != 0;
+}
+
 /**
  * Build a bookkeeping structure from the partition's FAT table.
  * If the partition has multiple FATs and they don't agree, try to pick a winner,
@@ -225,6 +242,14 @@ void read_fat(DOS_FS * fs, int mode)
 
     if (mode == 0)
         return;
+
+#ifdef __MINT__
+    if (preen) {
+	preen = fs_is_clean(fs, NULL);
+	if (preen)
+	    return;
+    }
+#endif
 
     /* Truncate any cluster chains that link to something out of range */
     for (i = 2; i < fs->data_clusters + 2; i++) {

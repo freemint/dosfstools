@@ -34,6 +34,11 @@
 
 extern int interactive;
 extern int write_immed;
+#ifdef __MINT__
+extern int preen;
+#else
+#define preen 0
+#endif
 /* Filesystem follows Atari GEMDOS rules rather than MS-DOS: filename
  * character set, FAT12/16 selection, special FAT values, cluster size and
  * sector-count limits.

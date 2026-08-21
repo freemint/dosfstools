@@ -80,7 +80,11 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "  -F NUM          specify FAT table NUM used for filesystem access\n");
     fprintf(stderr, "  -l              list path names\n");
     fprintf(stderr, "  -n              no-op, check non-interactively without changing\n");
+#ifdef __MINT__
+    fprintf(stderr, "  -p              like -a -V, but do not check when filesystem is clean\n");
+#else
     fprintf(stderr, "  -p              same as -a, for compat with other *fsck\n");
+#endif
     fprintf(stderr, "  -r              interactively repair the filesystem (default)\n");
     fprintf(stderr, "  -S              disallow spaces in the middle of short file names\n");
     fprintf(stderr, "  -t              test for bad clusters\n");
@@ -122,6 +126,9 @@ int main(int argc, char **argv)
     memset(&fs, 0, sizeof(fs));
     salvage_files = verify = 0;
     rw = interactive = 1;
+#ifdef __MINT__
+    gemdos_semantics = -1;	/* --variant=auto */
+#endif
 
     printf("fsck.fat " VERSION " (" VERSION_DATE ")\n");
 
@@ -131,8 +138,14 @@ int main(int argc, char **argv)
 	case 'A':		/* select Atari format */
 	    gemdos_semantics = 1;
 	    break;
-	case 'a':
 	case 'p':
+#ifdef __MINT__
+	    /* like -a -V, but skip the check when the filesystem is clean */
+	    verify = 1;
+	    preen = 1;
+#endif
+	    /* fall through */
+	case 'a':
 	case 'y':
 	    rw = 1;
 	    interactive = 0;
@@ -237,8 +250,12 @@ int main(int argc, char **argv)
 
     if (verify)
 	printf("Starting check/repair pass.\n");
-    while (read_fat(&fs, 2), scan_root(&fs))
+    while (read_fat(&fs, 2), !preen && scan_root(&fs))
 	qfree(&mem_queue);
+    if (preen) {
+	printf("Filesystem is clean.\n");
+	goto exit;
+    }
     check_label(&fs);
     if (test)
 	fix_bad(&fs);
@@ -278,7 +295,7 @@ exit:
 	    printf("\nLeaving filesystem unchanged.\n");
     }
 
-    if (!boot_only)
+    if (!boot_only && !preen)
 	printf("%s: %u files, %lu/%lu clusters\n", argv[optind],
 	       n_files, (unsigned long)fs.data_clusters - free_clusters,
 	       (unsigned long)fs.data_clusters);

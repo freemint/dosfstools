@@ -25,6 +25,7 @@ charconv_common_sources = charconv.c charconv.h
 charconv_common_ldadd = $(LIBICONV)
 fscklabel_common_sources = boot.c boot.h common.c common.h \
 			   fat.c fat.h io.c io.h msdos_fs.h \
+			   mint_io.c mint_io.h \
 			   $(charconv_common_sources) \
 			   fsck.fat.h endian_compat.h
 fsck_fat_SOURCES = check.c check.h file.c file.h fsck.fat.c \
