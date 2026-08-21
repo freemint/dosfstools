@@ -80,7 +80,11 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "  -F NUM          specify FAT table NUM used for filesystem access\n");
     fprintf(stderr, "  -l              list path names\n");
     fprintf(stderr, "  -n              no-op, check non-interactively without changing\n");
+#ifdef __MINT__
+    fprintf(stderr, "  -p              like -a -V, but do not check when filesystem is clean\n");
+#else
     fprintf(stderr, "  -p              same as -a, for compat with other *fsck\n");
+#endif
     fprintf(stderr, "  -r              interactively repair the filesystem (default)\n");
     fprintf(stderr, "  -S              disallow spaces in the middle of short file names\n");
     fprintf(stderr, "  -t              test for bad clusters\n");
@@ -89,7 +93,11 @@ static void usage(char *name, int exitval)
     fprintf(stderr, "  -U              allow only uppercase characters in volume and boot label\n");
     fprintf(stderr, "  -v              verbose mode\n");
     fprintf(stderr, "  -V              perform a verification pass\n");
+#ifdef __MINT__
+    fprintf(stderr, "  --variant=TYPE  select variant TYPE of filesystem (standard, atari or auto)\n");
+#else
     fprintf(stderr, "  --variant=TYPE  select variant TYPE of filesystem (standard or atari)\n");
+#endif
     fprintf(stderr, "  -w              write changes to disk immediately\n");
     fprintf(stderr, "  -y              same as -a, for compat with other *fsck\n");
     fprintf(stderr, "  --help          print this message\n");
@@ -122,6 +130,9 @@ int main(int argc, char **argv)
     memset(&fs, 0, sizeof(fs));
     salvage_files = verify = 0;
     rw = interactive = 1;
+#ifdef __MINT__
+    gemdos_semantics = -1;	/* --variant=auto */
+#endif
 
     printf("fsck.fat " VERSION " (" VERSION_DATE ")\n");
 
@@ -131,8 +142,14 @@ int main(int argc, char **argv)
 	case 'A':		/* select Atari format */
 	    gemdos_semantics = 1;
 	    break;
-	case 'a':
 	case 'p':
+#ifdef __MINT__
+	    /* like -a -V, but skip the check when the filesystem is clean */
+	    verify = 1;
+	    preen = 1;
+#endif
+	    /* fall through */
+	case 'a':
 	case 'y':
 	    rw = 1;
 	    interactive = 0;
@@ -199,6 +216,10 @@ int main(int argc, char **argv)
 		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
 		    gemdos_semantics = 1;
+#ifdef __MINT__
+	    } else if (!strcasecmp(optarg, "auto")) {
+		    gemdos_semantics = -1;
+#endif
 	    } else {
 		    fprintf(stderr, "Unknown variant: %s\n", optarg);
 		    usage(argv[0], 2);
@@ -233,10 +254,17 @@ int main(int argc, char **argv)
     if (boot_only)
 	goto exit;
 
+    read_fat(&fs, 2);
+    if (preen) {
+	printf("Filesystem is clean.\n");
+	goto exit;
+    }
     if (verify)
 	printf("Starting check/repair pass.\n");
-    while (read_fat(&fs, 2), scan_root(&fs))
+    while (scan_root(&fs)) {
 	qfree(&mem_queue);
+	read_fat(&fs, 2);
+    }
     check_label(&fs);
     if (test)
 	fix_bad(&fs);
@@ -276,7 +304,7 @@ exit:
 	    printf("\nLeaving filesystem unchanged.\n");
     }
 
-    if (!boot_only)
+    if (!boot_only && !preen)
 	printf("%s: %u files, %lu/%lu clusters\n", argv[optind],
 	       n_files, (unsigned long)fs.data_clusters - free_clusters,
 	       (unsigned long)fs.data_clusters);

@@ -41,9 +41,10 @@ A label can't be longer than 11 bytes and should be in all upper case for best
 compatibility.
 An empty string or a label consisting only of white space is not allowed.
 The characters \fB"*+,./:;<=>?[\e]|\fP are not allowed either.
-On a filesystem of the Atari variant only \fB*?\e/:".\fP are rejected: a FAT12
-or FAT16 filesystem with logical sectors larger than 512 bytes is taken as
-Atari.
+On a filesystem of the Atari variant only \fB*?\e/:".\fP are rejected: on
+FreeMiNT the variant is determined as by \fBfsck.fat \-\-variant=auto\fP,
+elsewhere a FAT12 or FAT16 filesystem with logical sectors larger than 512
+bytes is taken as Atari.
 If the boot sector holds executable boot code where the label is stored, the
 label is written to the root directory only, with a warning.
 A volume ID cannot be changed then, and \fBfatlabel\fP exits with an error.

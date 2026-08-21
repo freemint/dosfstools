@@ -574,6 +574,7 @@ void read_boot(DOS_FS * fs)
     unsigned total_fat_entries;
     off_t data_size;
     long long position;
+    const char *variant_source = NULL;
 
     fs_read(0, sizeof(b), &b);
     logical_sector_size = GET_UNALIGNED_W(b.sector_size);
@@ -637,9 +638,30 @@ void read_boot(DOS_FS * fs)
     /* Must run before the FAT type is decided below: enabling GEMDOS rules
      * changes the FAT12/16 selection. */
     if (gemdos_semantics == -1) {
+#ifdef __MINT__
+	/* The XHDI partition ID says how TOS will mount the partition, so it
+	 * is asked before the boot sector; it returns -1 when it cannot tell. */
+	gemdos_semantics = fs_type();
+	variant_source = "partition ID";
+	if (gemdos_semantics == -1) {
+	    gemdos_semantics = detect_gemdos_semantics(&b);
+	    variant_source = "logical sector size";
+	}
+	if (gemdos_semantics == -1) {
+	    gemdos_semantics = 1;
+	    variant_source = "not a partition";
+	}
+#else
 	gemdos_semantics = detect_gemdos_semantics(&b);
 	if (gemdos_semantics == -1)
 	    gemdos_semantics = 0;
+#endif
+    }
+    if (verbose) {
+	printf("%s variant", gemdos_semantics ? "Atari" : "Standard");
+	if (variant_source)
+	    printf(" (%s)", variant_source);
+	printf("\n");
     }
 
     if (!b.fat_length && b.fat32_length) {

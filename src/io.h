@@ -60,4 +60,10 @@ int fs_changed(void);
 
 /* Determines whether the filesystem has changed. See fs_close. */
 
+#ifdef __MINT__
+int fs_type(void);
+
+/* Variant implied by the XHDI partition ID (-1: unknown, 0: MS-DOS, 1: GEMDOS) */
+#endif
+
 #endif

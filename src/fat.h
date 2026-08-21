@@ -28,6 +28,12 @@ void read_fat(DOS_FS * fs, int mode);
 /* Loads the FAT of the filesystem described by FS. Initializes the FAT,
    replaces broken FATs and rejects invalid cluster entries. */
 
+int fs_is_clean(DOS_FS * fs);
+
+/* Returns non-zero if the filesystem's clean-shutdown flag (in FAT entry 1) is
+   set and the boot sector's dirty flag is not. FAT12 has no clean-shutdown
+   flag and always reports "not clean". */
+
 void release_fat(DOS_FS * fs);
 
 /* Release the FAT of the filesystem described by FS and free allocated memory.

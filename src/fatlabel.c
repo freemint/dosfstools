@@ -52,6 +52,22 @@ unsigned n_files = 0;
 void *mem_queue = NULL;
 
 
+static void convert_label(char label[12], char *newlabel)
+{
+    int i;
+
+    if (!local_string_to_dos_string(label, newlabel, 12)) {
+	fprintf(stderr,
+		"fatlabel: error when processing label\n");
+	exit(1);
+    }
+
+    for (i = strlen(label); i < 11; ++i)
+	label[i] = ' ';
+    label[11] = 0;
+}
+
+
 static int handle_label(bool change, bool reset, const char *device, char *newlabel)
 {
     DOS_FS fs = { 0 };
@@ -61,10 +77,6 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
     char label[12] = { 0 };
     size_t len;
     int ret;
-    int i;
-
-    fs_open(device, rw);
-    read_boot(&fs);
 
     if (change) {
 	len = mbstowcs(NULL, newlabel, 0);
@@ -74,17 +86,12 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 	    exit(1);
 	}
 
-	if (!local_string_to_dos_string(label, newlabel, 12)) {
-	    fprintf(stderr,
-		    "fatlabel: error when processing label\n");
-	    exit(1);
-	}
-
-	for (i = strlen(label); i < 11; ++i)
-	    label[i] = ' ';
-	label[11] = 0;
-
+	/* opening the filesystem tells the variant, but on FreeMiNT it also
+	 * locks the drive: check first against what no variant allows */
+	gemdos_semantics = 1;
+	convert_label(label, newlabel);
 	ret = validate_volume_label(label);
+	gemdos_semantics = -1;
 	if (ret & 0x1) {
 	    fprintf(stderr,
 		    "fatlabel: warning - lowercase labels might not work properly on some systems\n");
@@ -97,7 +104,7 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 	if (ret & 0x4) {
 	    fprintf(stderr,
 		    "fatlabel: labels with characters %s are not allowed\n",
-		    volume_label_bad_chars());
+		    GEMDOS_BAD_CHARS);
 	    exit(1);
 	}
 	if (ret & 0x08) {
@@ -108,6 +115,21 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 	if (ret & 0x10) {
 	    fprintf(stderr,
 		    "fatlabel: labels can't start with a space character\n");
+	    exit(1);
+	}
+    }
+
+    fs_open(device, rw);
+    read_boot(&fs);
+
+    /* the standard variant rejects more characters, and on FreeMiNT it
+     * uses another character set */
+    if (change && !gemdos_semantics) {
+	convert_label(label, newlabel);
+	if (validate_volume_label(label) & 0x04) {
+	    fprintf(stderr,
+		    "fatlabel: labels with characters %s are not allowed\n",
+		    volume_label_bad_chars());
 	    exit(1);
 	}
     }

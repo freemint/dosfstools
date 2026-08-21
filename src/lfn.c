@@ -33,6 +33,7 @@
 #include "fsck.fat.h"
 #include "lfn.h"
 #include "file.h"
+#include "charconv.h"
 
 typedef struct {
     uint8_t id;			/* sequence number for slot */
@@ -84,15 +85,15 @@ static unsigned char fat_uni2esc[64] = {
 static size_t mbslen(wchar_t x)
 {
     wchar_t wstr[] = { x, 0 };
-    return wcstombs(NULL, wstr, 0);
+    return local_wcstombs(NULL, wstr, 0);
 }
 
 static size_t wctombs(char *dest, wchar_t x)
 {
     wchar_t wstr[] = { x, 0 };
-    size_t size = wcstombs(NULL, wstr, 0);
+    size_t size = local_wcstombs(NULL, wstr, 0);
     if (size != (size_t) - 1)
-	size = wcstombs(dest, wstr, size + 1);
+	size = local_wcstombs(dest, wstr, size + 1);
     return size;
 }
 

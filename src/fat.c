@@ -25,6 +25,7 @@
 /* FAT32, VFAT, Atari format support, and various fixes additions May 1998
  * by Roman Hodek <Roman.Hodek@informatik.uni-erlangen.de> */
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,6 +101,25 @@ static void fix_first_cluster(DOS_FS * fs, void * first_cluster)
         *(uint16_t *)first_cluster = htole16(FAT_EXTD(fs) | b.media);
     else
         *(uint32_t *)first_cluster = htole32(FAT_EXTD(fs) | b.media);
+}
+
+int fs_is_clean(DOS_FS * fs)
+{
+    unsigned char sec[512];
+    FAT_ENTRY flags;
+    int fat32 = fs->fat_bits == 32;
+
+    if (fs->fat_bits == 12)
+	return 0;
+
+    fs_read(0, sizeof(sec), sec);
+    if (boot_is_dirty(sec, fat32))
+	return 0;
+
+    get_fat(&flags, fs->fat, 1, fs);
+    return fat32
+	? (flags.value & FAT32_FLAG_CLEAN_SHUTDOWN) != 0
+	: (flags.value & FAT16_FLAG_CLEAN_SHUTDOWN) != 0;
 }
 
 /**
@@ -225,6 +245,16 @@ void read_fat(DOS_FS * fs, int mode)
 
     if (mode == 0)
         return;
+
+#ifdef __MINT__
+    if (preen) {
+	/* a repair made so far, such as rewriting a differing FAT copy, means
+	 * the filesystem is not clean whatever its flags say */
+	preen = !fs_changed() && fs_is_clean(fs);
+	if (preen)
+	    return;
+    }
+#endif
 
     /* Truncate any cluster chains that link to something out of range */
     for (i = 2; i < fs->data_clusters + 2; i++) {

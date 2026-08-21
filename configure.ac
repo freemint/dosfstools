@@ -34,6 +34,9 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
 AC_PROG_LN_S
 
+AC_CANONICAL_HOST
+AM_CONDITIONAL([MINT], [case $host in *-mint*) true ;; *) false ;; esac])
+
 AC_SYS_LARGEFILE
 
 AC_CHECK_HEADERS([\

@@ -42,6 +42,9 @@
 
 int interactive;
 int write_immed;
+#ifdef __MINT__
+int preen;
+#endif
 int gemdos_semantics;
 const char *program_name;
 

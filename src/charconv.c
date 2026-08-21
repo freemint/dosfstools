@@ -21,7 +21,12 @@
 */
 
 #include "charconv.h"
+#ifndef __MINT__
 #include <langinfo.h>
+#else
+/* names are converted through the Atari ST table, which iconv would bypass */
+#undef HAVE_ICONV
+#endif
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +36,10 @@
 
 #ifdef HAVE_ICONV
 #include <iconv.h>
+#endif
+
+#ifdef __MINT__
+#include "common.h"
 #endif
 
 /* CP850 table for 0x80-0xFF range from:
@@ -55,6 +64,92 @@ static const wchar_t cp850_table[128] = {
     0x00b0, 0x00a8, 0x00b7, 0x00b9, 0x00b3, 0x00b2, 0x25a0, 0x00a0,
 };
 
+#ifdef __MINT__
+/* Atari ST character set for 0x80-0xFF range, as the FreeMiNT kernel maps it.
+ * It is the console encoding, and names on a GEMDOS filesystem use it, too.
+ */
+static const wchar_t atarist_table[128] = {
+    0x00c7, 0x00fc, 0x00e9, 0x00e2, 0x00e4, 0x00e0, 0x00e5, 0x00e7,
+    0x00ea, 0x00eb, 0x00e8, 0x00ef, 0x00ee, 0x00ec, 0x00c4, 0x00c5,
+    0x00c9, 0x00e6, 0x00c6, 0x00f4, 0x00f6, 0x00f2, 0x00fb, 0x00f9,
+    0x00ff, 0x00d6, 0x00dc, 0x00a2, 0x00a3, 0x00a5, 0x00df, 0x0192,
+    0x00e1, 0x00ed, 0x00f3, 0x00fa, 0x00f1, 0x00d1, 0x00aa, 0x00ba,
+    0x00bf, 0x2310, 0x00ac, 0x00bd, 0x00bc, 0x00a1, 0x00ab, 0x00bb,
+    0x00e3, 0x00f5, 0x00d8, 0x00f8, 0x0153, 0x0152, 0x00c0, 0x00c3,
+    0x00d5, 0x00a8, 0x00b4, 0x2020, 0x00b6, 0x00a9, 0x00ae, 0x2122,
+    0x0133, 0x0132, 0x05d0, 0x05d1, 0x05d2, 0x05d3, 0x05d4, 0x05d5,
+    0x05d6, 0x05d7, 0x05d8, 0x05d9, 0x05db, 0x05dc, 0x05de, 0x05e0,
+    0x05e1, 0x05e2, 0x05e4, 0x05e6, 0x05e7, 0x05e8, 0x05e9, 0x05ea,
+    0x05df, 0x05da, 0x05dd, 0x05e3, 0x05e5, 0x00a7, 0x2038, 0x221e,
+    0x03b1, 0x03b2, 0x0393, 0x03c0, 0x03a3, 0x03c3, 0x00b5, 0x03c4,
+    0x03a6, 0x03b8, 0x2126, 0x03b4, 0x222e, 0x03c6, 0x2208, 0x220f,
+    0x2261, 0x00b1, 0x2265, 0x2264, 0x2320, 0x2321, 0x00f7, 0x2248,
+    0x00b0, 0x2022, 0x00b7, 0x221a, 0x207f, 0x00b2, 0x00b3, 0x00af,
+};
+#endif
+
+/* Character set of names on the filesystem */
+static const wchar_t *dos_table(void)
+{
+#ifdef __MINT__
+    if (gemdos_semantics)
+        return atarist_table;
+#endif
+    return cp850_table;
+}
+
+static const char *dos_table_name(void)
+{
+#ifdef __MINT__
+    if (gemdos_semantics)
+        return "ATARIST";
+#endif
+    return "CP850";
+}
+
+#ifdef __MINT__
+/* mintlib's multibyte functions only know UTF-8, but the FreeMiNT console uses
+ * the Atari ST character set */
+static size_t local_mbstowcs(wchar_t *out, const char *in, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n && in[i]; ++i)
+        out[i] = (in[i] & 0x80) ? atarist_table[in[i] & 0x7F] : in[i];
+    if (i < n)
+        out[i] = L'\0';
+    return i;
+}
+
+size_t local_wcstombs(char *out, const wchar_t *in, size_t n)
+{
+    size_t i;
+    unsigned j;
+    for (i = 0; (!out || i < n) && in[i]; ++i) {
+        if (in[i] > 0 && in[i] < 0x80) {
+            if (out)
+                out[i] = in[i];
+            continue;
+        }
+        for (j = 0; j < 0x80 && in[i] != atarist_table[j]; ++j)
+            ;
+        if (j == 0x80)
+            return (size_t)-1;
+        if (out)
+            out[i] = 0x80 | j;
+    }
+    if (out && i < n)
+        out[i] = 0;
+    return i;
+}
+#else
+#define local_mbstowcs mbstowcs
+
+size_t local_wcstombs(char *out, const wchar_t *in, size_t n)
+{
+    return wcstombs(out, in, n);
+}
+#endif
+
 /* CP850 translit table to 7bit ASCII for 0x80-0xFF range */
 static const char *const cp850_translit_table[128] = {
     "C",   "u",   "e",  "a",     "a",     "a", "a",   "c",
@@ -77,6 +172,7 @@ static const char *const cp850_translit_table[128] = {
 
 static int wchar_string_to_cp850_string(char *out, const wchar_t *in, unsigned int out_size)
 {
+    const wchar_t *table = dos_table();
     unsigned i, j;
     for (i = 0; i < out_size-1 && in[i]; ++i) {
         if (in[i] > 0 && in[i] < 0x80) {
@@ -84,18 +180,18 @@ static int wchar_string_to_cp850_string(char *out, const wchar_t *in, unsigned i
             continue;
         }
         for (j = 0; j < 0x80; ++j) {
-            if (in[i] == cp850_table[j]) {
+            if (in[i] == table[j]) {
                 out[i] = (0x80 | j);
                 break;
             }
         }
         if (j == 0x80) {
-            fprintf(stderr, "Cannot convert input character 0x%04x to 'CP850': %s\n", (unsigned int)in[i], strerror(EILSEQ));
+            fprintf(stderr, "Cannot convert input character 0x%04x to '%s': %s\n", (unsigned int)in[i], dos_table_name(), strerror(EILSEQ));
             return 0;
         }
     }
     if (in[i]) {
-        fprintf(stderr, "Cannot convert input string to 'CP850': String is too long\n");
+        fprintf(stderr, "Cannot convert input string to '%s': String is too long\n", dos_table_name());
         return 0;
     }
     out[i] = 0;
@@ -106,10 +202,10 @@ static int cp850_string_to_wchar_string(wchar_t *out, const char *in, unsigned i
 {
     unsigned i;
     for (i = 0; i < out_size-1 && i < 11 && in[i]; ++i) {
-        out[i] = (in[i] & 0x80) ? cp850_table[in[i] & 0x7F] : in[i];
+        out[i] = (in[i] & 0x80) ? dos_table()[in[i] & 0x7F] : in[i];
     }
     if (i < 11 && in[i]) {
-        fprintf(stderr, "Cannot convert input string to 'CP850': String is too long\n");
+        fprintf(stderr, "Cannot convert input string to '%s': String is too long\n", dos_table_name());
         return 0;
     }
     out[i] = L'\0';
@@ -122,9 +218,9 @@ static int cp850_char_to_printable(char **p, unsigned char c, unsigned int out_s
     wchar_t wcs[2];
     if (!c)
         return 0;
-    wcs[0] = (c & 0x80) ? cp850_table[c & 0x7F] : c;
+    wcs[0] = (c & 0x80) ? dos_table()[c & 0x7F] : c;
     wcs[1] = 0;
-    ret = wcstombs(*p, wcs, out_size);
+    ret = local_wcstombs(*p, wcs, out_size);
     if (ret == 0)
         return 0;
     if (ret != (size_t)-1)
@@ -146,16 +242,16 @@ static int local_string_to_cp850_string(char *out, const char *in, unsigned int 
     int ret;
     wchar_t *wcs;
     if (strlen(in) >= out_size) {
-        fprintf(stderr, "Cannot convert input string '%s' to 'CP850': String is too long\n", in);
+        fprintf(stderr, "Cannot convert input string '%s' to '%s': String is too long\n", in, dos_table_name());
         return 0;
     }
     wcs = calloc(out_size, sizeof(wchar_t));
     if (!wcs) {
-        fprintf(stderr, "Cannot convert input string '%s' to 'CP850': %s\n", in, strerror(ENOMEM));
+        fprintf(stderr, "Cannot convert input string '%s' to '%s': %s\n", in, dos_table_name(), strerror(ENOMEM));
         return 0;
     }
-    if (mbstowcs(wcs, in, out_size) == (size_t)-1) {
-        fprintf(stderr, "Cannot convert input string '%s' to 'CP850': %s\n", in, strerror(errno));
+    if (local_mbstowcs(wcs, in, out_size) == (size_t)-1) {
+        fprintf(stderr, "Cannot convert input string '%s' to '%s': %s\n", in, dos_table_name(), strerror(errno));
         free(wcs);
         return 0;
     }
