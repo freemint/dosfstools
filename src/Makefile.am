@@ -17,11 +17,11 @@
 AM_CFLAGS = -Wall -Wextra -Wno-sign-compare -Wno-missing-field-initializers \
 	    -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings
 
-AM_CPPFLAGS = -I$(srcdir)/libIO
+AM_CPPFLAGS = $(MINT_LFS_CPPFLAGS) -I$(srcdir)/libIO
 
 sbin_PROGRAMS = fsck.fat mkfs.fat fatlabel
 noinst_PROGRAMS = testdevinfo
-EXTRA_DIST = blkdev/README
+EXTRA_DIST = blkdev/README mint_lfs.h
 
 charconv_common_sources = charconv.c charconv.h
 charconv_common_ldadd = $(LIBICONV)

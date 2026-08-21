@@ -38,6 +38,13 @@ AC_CANONICAL_HOST
 AM_CONDITIONAL([MINT], [case $host in *-mint*) true ;; *) false ;; esac])
 
 AC_SYS_LARGEFILE
+MINT_LFS_CPPFLAGS=
+case $host in
+  *-mint*)
+	MINT_LFS_CPPFLAGS='-include $(top_srcdir)/src/mint_lfs.h'
+	;;
+esac
+AC_SUBST([MINT_LFS_CPPFLAGS])
 
 AC_CHECK_HEADERS([\
 		  err.h \
