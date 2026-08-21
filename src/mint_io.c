@@ -11,6 +11,12 @@
 
 # ifdef __MINT__
 
+/* This file is the 32-bit libc-facing boundary: undo the forced 64-bit off_t
+ * (see mint_lfs.h) so our open/read/write/lseek/__lseek/fstat declarations match
+ * mintlib's real (32-bit) syscalls. llseek() below uses loff_t explicitly and
+ * stays 64-bit regardless, and is what the filesystem code seeks through. */
+# undef __USE_FILE_OFFSET64
+
 # include <assert.h>
 # include <ctype.h>
 # include <errno.h>
