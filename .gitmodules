@@ -1,0 +1,3 @@
+[submodule "src/libIO"]
+	path = src/libIO
+	url = https://github.com/freemint/libIO.git

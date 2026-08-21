@@ -32,5 +32,6 @@ int dos_char_to_printable(char **p, unsigned char c, unsigned int out_size);
 int local_string_to_dos_string(char *out, char *in, unsigned int out_size);
 int dos_string_to_wchar_string(wchar_t *out, char *in, unsigned int out_size);
 int wchar_string_to_dos_string(char *out, wchar_t *in, unsigned int out_size);
+size_t local_wcstombs(char *out, const wchar_t *in, size_t n);
 
 #endif

@@ -511,6 +511,34 @@ int check_boot_code(const unsigned char *sec, int end)
 	return 1;
 }
 
+/* Whether the boot sector shows a GEMDOS filesystem; -1 when it does not tell */
+static int detect_gemdos_semantics(const struct boot_sector *b, unsigned data_clusters)
+{
+	const struct boot_sector_16 *b16 = (const struct boot_sector_16 *)b;
+
+#ifdef __MINT__
+	/* on FreeMiNT, a filesystem is taken as one of a hard disk partition
+	 * unless the cluster count calls for a 12 bit FAT */
+	if ((!b->fat_length && b->fat32_length) || data_clusters >= FAT12_THRESHOLD)
+		return 1;
+	/* Logical sector scaling is how TOS and HD Driver grow a partition past
+	 * the 16-bit sector count; elsewhere 4Kn drives have such sectors too. */
+	if (GET_UNALIGNED_W(b->sector_size) > 512)
+		return 1;
+#else
+	/* GEMDOS cannot read FAT32 at all, so a FAT32 sector says nothing about
+	 * how the files were written */
+	if (!b->fat_length && b->fat32_length)
+		return -1;
+#endif
+	/* MS-DOS uses a 12 bit FAT below the threshold, GEMDOS a 16 bit FAT on
+	 * any hard disk, and mkfs.fat -A writes the type it chose */
+	if (b16->extended_sig == 0x29 && !memcmp(b16->fs_type, "FAT16   ", 8) &&
+	    data_clusters < FAT12_THRESHOLD)
+		return 1;
+	return -1;
+}
+
 void read_boot(DOS_FS * fs)
 {
     struct boot_sector b;
@@ -520,6 +548,7 @@ void read_boot(DOS_FS * fs)
     unsigned total_fat_entries;
     off_t data_size;
     long long position;
+    const char *variant_source = NULL;
 
     fs_read(0, sizeof(b), &b);
     logical_sector_size = GET_UNALIGNED_W(b.sector_size);
@@ -579,6 +608,36 @@ void read_boot(DOS_FS * fs)
     fs->root_cluster = 0;	/* indicates standard, pre-FAT32 root dir */
     fs->fsinfo_start = 0;	/* no FSINFO structure */
     fs->free_clusters = -1;	/* unknown */
+
+    /* Must run before the FAT type is decided below: enabling GEMDOS rules
+     * changes the FAT12/16 selection. */
+    if (gemdos_semantics == -1) {
+#ifdef __MINT__
+	/* The XHDI partition ID says how TOS will mount the partition, so it
+	 * is asked before the boot sector; it returns -1 when it cannot tell. */
+	gemdos_semantics = fs_type();
+	variant_source = "partition ID";
+	if (gemdos_semantics == -1) {
+	    gemdos_semantics = detect_gemdos_semantics(&b, fs->data_clusters);
+	    variant_source = "boot sector";
+	}
+	if (gemdos_semantics == -1) {
+	    gemdos_semantics = 0;
+	    variant_source = "not a partition";
+	}
+#else
+	gemdos_semantics = detect_gemdos_semantics(&b, fs->data_clusters);
+	if (gemdos_semantics == -1)
+	    gemdos_semantics = 0;
+#endif
+    }
+    if (verbose) {
+	printf("%s variant", gemdos_semantics ? "Atari" : "Standard");
+	if (variant_source)
+	    printf(" (%s)", variant_source);
+	printf("\n");
+    }
+
     if (!b.fat_length && b.fat32_length) {
 	fs->fat_bits = 32;
 	fs->root_cluster = le32toh(b.root_cluster);

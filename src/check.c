@@ -1034,9 +1034,9 @@ static char print_fat_dirty_state(void)
 		      2, "No action");
 }
 
-/* Under GEMDOS rules the dirty flag in the boot sector is left alone: only
- * Linux and Windows set it, and where TOS boot code reaches that far, the byte
- * is code. */
+/* The dirty flag in the boot sector is left alone under GEMDOS rules, and on
+ * FreeMiNT unless the standard variant is asked for: only Linux and Windows set
+ * it, and where TOS boot code reaches that far, the byte is code. */
 void check_dirty_bits(DOS_FS * fs)
 {
     if (fs->fat_bits == 32) {
@@ -1046,7 +1046,7 @@ void check_dirty_bits(DOS_FS * fs)
 
 	get_fat(&fat32_flags, fs->fat, 1, fs);
 	fs_read(0, sizeof(b32), &b32);
-	boot_dirty = !gemdos_semantics && (b32.boot_flags & FAT_STATE_DIRTY);
+	boot_dirty = boot_dirty_checked && (b32.boot_flags & FAT_STATE_DIRTY);
 
 	if (boot_dirty || !(fat32_flags.value & FAT32_FLAG_CLEAN_SHUTDOWN)) {
 	    if (print_fat_dirty_state() == 1) {
@@ -1070,7 +1070,7 @@ void check_dirty_bits(DOS_FS * fs)
 	int boot_dirty;
 
 	fs_read(0, sizeof(b16), &b16);
-	boot_dirty = !gemdos_semantics && (b16.boot_flags & FAT_STATE_DIRTY);
+	boot_dirty = boot_dirty_checked && (b16.boot_flags & FAT_STATE_DIRTY);
 
 	if (fs->fat_bits == 16) {
 	    get_fat(&fat16_flags, fs->fat, 1, fs);
