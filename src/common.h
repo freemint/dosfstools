@@ -34,10 +34,24 @@
 
 extern int interactive;
 extern int write_immed;
+#ifdef __MINT__
+extern int preen;
+#else
+#define preen 0
+#endif
 /* Filesystem follows Atari GEMDOS rules rather than MS-DOS: filename
  * character set, FAT12/16 selection, special FAT values, cluster size and
- * sector-count limits. */
+ * sector-count limits.
+ * 0: MS-DOS, 1: GEMDOS, -1: decide from the filesystem.
+ * -1 is resolved to 0 or 1 before any of these rules is applied; from then on
+ * this is a plain boolean. */
 extern int gemdos_semantics;
+#ifdef __MINT__
+/* fsck.fat checks the dirty flag in the boot sector */
+extern int boot_dirty_checked;
+#else
+#define boot_dirty_checked (!gemdos_semantics)
+#endif
 
 /* Characters GEMDOS rejects in a directory entry. A volume label is one such
  * entry in the root directory, mirrored into the boot sector, and both copies

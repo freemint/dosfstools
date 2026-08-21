@@ -52,6 +52,58 @@ unsigned n_files = 0;
 void *mem_queue = NULL;
 
 
+static void convert_label(char label[12], char *newlabel)
+{
+    int i;
+
+    if (!local_string_to_dos_string(label, newlabel, 12)) {
+	fprintf(stderr,
+		"fatlabel: error when processing label\n");
+	exit(1);
+    }
+
+    for (i = strlen(label); i < 11; ++i)
+	label[i] = ' ';
+    label[11] = 0;
+}
+
+
+/* Convert newlabel for the current variant and exit on a label the variant
+ * rejects; 'all' also reports what no variant allows */
+static void check_new_label(char label[12], char *newlabel, int all)
+{
+    int ret;
+
+    convert_label(label, newlabel);
+    ret = validate_volume_label(label);
+    if (all && (ret & 0x1)) {
+	fprintf(stderr,
+		"fatlabel: warning - lowercase labels might not work properly on some systems\n");
+    }
+    if (all && (ret & 0x2)) {
+	fprintf(stderr,
+		"fatlabel: labels with characters below 0x20 are not allowed\n");
+	exit(1);
+    }
+    if (ret & 0x4) {
+	fprintf(stderr,
+		"fatlabel: labels with characters %s are not allowed\n",
+		volume_label_bad_chars());
+	exit(1);
+    }
+    if (all && (ret & 0x08)) {
+	fprintf(stderr,
+		"fatlabel: labels can't be empty or white space only\n");
+	exit(1);
+    }
+    if (all && (ret & 0x10)) {
+	fprintf(stderr,
+		"fatlabel: labels can't start with a space character\n");
+	exit(1);
+    }
+}
+
+
 static int handle_label(bool change, bool reset, const char *device, char *newlabel)
 {
     DOS_FS fs = { 0 };
@@ -60,8 +112,6 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 
     char label[12] = { 0 };
     size_t len;
-    int ret;
-    int i;
 
     if (change) {
 	len = mbstowcs(NULL, newlabel, 0);
@@ -71,46 +121,28 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 	    exit(1);
 	}
 
-	if (!local_string_to_dos_string(label, newlabel, 12)) {
-	    fprintf(stderr,
-		    "fatlabel: error when processing label\n");
-	    exit(1);
-	}
-
-	for (i = strlen(label); i < 11; ++i)
-	    label[i] = ' ';
-	label[11] = 0;
-
-	ret = validate_volume_label(label);
-	if (ret & 0x1) {
-	    fprintf(stderr,
-		    "fatlabel: warning - lowercase labels might not work properly on some systems\n");
-	}
-	if (ret & 0x2) {
-	    fprintf(stderr,
-		    "fatlabel: labels with characters below 0x20 are not allowed\n");
-	    exit(1);
-	}
-	if (ret & 0x4) {
-	    fprintf(stderr,
-		    "fatlabel: labels with characters %s are not allowed\n",
-		    volume_label_bad_chars());
-	    exit(1);
-	}
-	if (ret & 0x08) {
-	    fprintf(stderr,
-		    "fatlabel: labels can't be empty or white space only\n");
-	    exit(1);
-	}
-	if (ret & 0x10) {
-	    fprintf(stderr,
-		    "fatlabel: labels can't start with a space character\n");
-	    exit(1);
-	}
+#ifdef __MINT__
+	/* opening the filesystem tells the variant, but on FreeMiNT it also
+	 * locks the drive: check first against what no variant allows */
+	gemdos_semantics = 1;
+	check_new_label(label, newlabel, 1);
+	gemdos_semantics = -1;
+#endif
     }
 
     fs_open(device, rw);
     read_boot(&fs);
+
+    if (change) {
+#ifdef __MINT__
+	/* the standard variant rejects more characters and uses another
+	 * character set */
+	if (!gemdos_semantics)
+	    check_new_label(label, newlabel, 0);
+#else
+	check_new_label(label, newlabel, 1);
+#endif
+    }
 
     if (!change && !reset) {
 	if (fs.fat_bits == 32)
@@ -227,6 +259,9 @@ int main(int argc, char *argv[])
     long codepage = -1;
     int c;
     int ret;
+
+    /* fatlabel has no --variant option, so the filesystem decides */
+    gemdos_semantics = -1;
 
     while ((c = getopt_long(argc, argv, "irc:Vh", long_options, NULL)) != -1) {
 	switch (c) {

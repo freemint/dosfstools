@@ -60,4 +60,16 @@ int fs_changed(void);
 
 /* Determines whether the filesystem has changed. See fs_close. */
 
+#ifdef __MINT__
+int fs_type(void);
+
+/* Variant implied by the XHDI partition ID (-1: unknown, 0: MS-DOS, 1: GEMDOS) */
+
+int fs_gemdos_partition(void);
+
+/* Non-zero for a GEM or BGM partition, which TOS reads with a 16 bit FAT */
+#else
+#define fs_gemdos_partition() 0
+#endif
+
 #endif

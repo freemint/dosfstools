@@ -131,6 +131,7 @@ other a 16 bit FAT.
 In the standard variant, an Atari filesystem with fewer than 4085 clusters would
 be taken to have a 12 bit FAT and be damaged by a repair, so check it with
 \fB\-A\fP.
+On FreeMiNT, a GEM or BGM partition always has a 16 bit FAT.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4
@@ -176,6 +177,9 @@ No-operation mode: non-interactively check for errors, but don't write
 anything to the filesystem.
 .IP "\fB\-p\fP" 4
 Same as \fB\-a\fP, for compatibility with other *fsck.
+On FreeMiNT, same as \fB\-a \-V\fP, but nothing is checked when the filesystem
+is marked clean: FreeMiNT removes that mark while a FAT16 or FAT32 filesystem is
+mounted, TOS leaves it alone, and a FAT12 filesystem is always checked.
 .IP "\fB\-r\fP" 4
 Interactively repair the filesystem.
 The user is asked for advice whenever there is more than one approach to fix an
@@ -225,6 +229,14 @@ read.
 Handle a filesystem of variant \fITYPE\fP.
 Acceptable values are \fIstandard\fP and \fIatari\fP (in any combination of
 upper/lower case).
+On FreeMiNT \fIauto\fP is accepted as well and is the default: a DOS partition
+ID means \fIstandard\fP and any other \fIatari\fP; a filesystem that is not a
+partition, such as an image file, is taken as \fIatari\fP when it is FAT12 or
+FAT16 with logical sectors larger than 512 bytes, or when its boot sector says
+FAT16 where the cluster count calls for FAT12, as \fBmkfs.fat \-A\fP writes it;
+it is \fIstandard\fP otherwise.
+The dirty flag in the boot sector is checked only with an explicit
+\fIstandard\fP.
 See above under DESCRIPTION for the differences.
 .IP "\fB\-w\fP" 4
 Write changes to disk immediately.

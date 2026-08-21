@@ -50,3 +50,7 @@ in the repository.
 
 First, autoconf, automake and gettext have to be installed.  Then you can run
 `./autogen.sh` to generate all the required files.
+
+A build for FreeMiNT also needs the libIO submodule, which `git submodule
+update --init` fetches.  A tarball made with `make dist` includes it only when
+it was fetched.

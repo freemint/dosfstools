@@ -34,6 +34,15 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
 AC_PROG_LN_S
 
+AC_CANONICAL_HOST
+AM_CONDITIONAL([MINT], [case $host in *-mint*) true ;; *) false ;; esac])
+case $host in
+  *-mint*)
+	AS_IF([test ! -f "$srcdir/src/libIO/mint_io.c"],
+	      [AC_MSG_ERROR([src/libIO is empty; run git submodule update --init])])
+	;;
+esac
+
 AC_SYS_LARGEFILE
 
 AC_CHECK_HEADERS([\

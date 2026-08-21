@@ -17,6 +17,8 @@
 AM_CFLAGS = -Wall -Wextra -Wno-sign-compare -Wno-missing-field-initializers \
 	    -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings
 
+AM_CPPFLAGS = -I$(srcdir)/libIO
+
 sbin_PROGRAMS = fsck.fat mkfs.fat fatlabel
 noinst_PROGRAMS = testdevinfo
 EXTRA_DIST = blkdev/README
@@ -46,6 +48,20 @@ mkfs_fat_LDADD    = $(charconv_common_ldadd)
 testdevinfo_SOURCES  = testdevinfo.c $(devinfo_common_sources)
 testdevinfo_CPPFLAGS = -I$(srcdir)/blkdev
 testdevinfo_CFLAGS   = $(AM_CFLAGS)
+
+# libIO is a git submodule, so a tree without it can still make a tarball;
+# the tarball gets libIO when it is there
+if MINT
+libio_sources = libIO/mint_io.c libIO/xhdi.c
+endif
+nodist_fsck_fat_SOURCES = $(libio_sources)
+nodist_fatlabel_SOURCES = $(libio_sources)
+
+dist-hook:
+	if test -f $(srcdir)/libIO/mint_io.c; then \
+		$(MKDIR_P) $(distdir)/libIO && \
+		cp $(srcdir)/libIO/*.[ch] $(distdir)/libIO; \
+	fi
 
 
 if COMPAT_SYMLINKS

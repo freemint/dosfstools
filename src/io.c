@@ -45,6 +45,10 @@
 #include "common.h"
 #include "io.h"
 
+#ifdef __MINT__
+#include "mint_io.h"
+#endif
+
 typedef struct _change {
     void *data;
     off_t pos;
@@ -184,3 +188,15 @@ int fs_changed(void)
 {
     return ! !changes || did_change;
 }
+
+#ifdef __MINT__
+int fs_type(void)
+{
+    return gettype(fd);
+}
+
+int fs_gemdos_partition(void)
+{
+    return gemdos_partition(fd);
+}
+#endif
