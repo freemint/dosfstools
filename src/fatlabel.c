@@ -63,6 +63,9 @@ static void handle_label(bool change, bool reset, const char *device, char *newl
     int ret;
     int i;
 
+    fs_open(device, rw);
+    read_boot(&fs);
+
     if (change) {
 	len = mbstowcs(NULL, newlabel, 0);
 	if (len != (size_t)-1 && len > 11) {
@@ -93,7 +96,8 @@ static void handle_label(bool change, bool reset, const char *device, char *newl
 	}
 	if (ret & 0x4) {
 	    fprintf(stderr,
-		    "fatlabel: labels with characters *?.,;:/\\|+=<>[]\" are not allowed\n");
+		    "fatlabel: labels with characters %s are not allowed\n",
+		    volume_label_bad_chars());
 	    exit(1);
 	}
 	if (ret & 0x08) {
@@ -107,9 +111,6 @@ static void handle_label(bool change, bool reset, const char *device, char *newl
 	    exit(1);
 	}
     }
-
-    fs_open(device, rw);
-    read_boot(&fs);
 
     if (!change && !reset) {
 	if (fs.fat_bits == 32)

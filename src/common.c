@@ -295,6 +295,19 @@ uint32_t generate_volume_id(void)
 }
 
 /*
+ * Characters a volume label must not contain, after conversion to the DOS OEM
+ * code page. Applies to both copies of the label, the root directory entry and
+ * the boot sector field, which have to agree.
+ */
+const char *volume_label_bad_chars(void)
+{
+    /* GEMDOS does not follow the FAT specification here: it only reserves the
+       characters that are special to its own path syntax, and accepts the rest.
+       The MS-DOS set is the one the specification disallows in DIR_Name. */
+    return gemdos_semantics ? GEMDOS_BAD_CHARS : "\"*+,./:;<=>?[\\]|";
+}
+
+/*
  * Validate volume label
  *
  * @param[in]   doslabel   Label stored according to current DOS codepage
@@ -327,19 +340,11 @@ int validate_volume_label(char *doslabel)
         }
     }
 
-    /* According to FAT specification those bytes (after conversion to DOS OEM
-       code page) are not allowed.
-     */
     for (i = 0; i < 11; i++) {
         if ((unsigned) doslabel[i] < 0x20)
             ret |= 0x02;
-        if (doslabel[i] == 0x22 ||
-            (doslabel[i] >= 0x2A && doslabel[i] <= 0x2C) ||
-            doslabel[i] == 0x2E ||
-            doslabel[i] == 0x2F ||
-            (doslabel[i] >= 0x3A && doslabel[i] <= 0x3F) ||
-            (doslabel[i] >= 0x5B && doslabel[i] <= 0x5D) ||
-            doslabel[i] == 0x7C)
+        /* a NUL is already covered above; strchr() would match the terminator */
+        if (doslabel[i] && strchr(volume_label_bad_chars(), doslabel[i]))
             ret |= 0x04;
     }
 

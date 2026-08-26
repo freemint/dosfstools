@@ -146,7 +146,7 @@ static char *file_stat(DOS_FILE * file)
 static int bad_name(DOS_FILE * file)
 {
     int i, spc, suspicious = 0;
-    const char *bad_chars = gemdos_semantics ? "*?\\/:" : "*?<>|\"\\/:.";
+    const char *bad_chars = gemdos_semantics ? GEMDOS_BAD_CHARS : "*?<>|\"\\/:.";
     const char *allowed_nonascii = gemdos_semantics ? "\200\216\217\220\222\231\232\245\265\266\267\270\236" : "\200\216\217\220\222\231\232\245\265\266\267\270\341";
     const unsigned char *name = file->dir_ent.name;
     const unsigned char *ext = name + 8;

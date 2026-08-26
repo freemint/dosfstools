@@ -754,7 +754,8 @@ static void setup_tables(void)
     if (ret & 0x2)
 	die("Labels with characters below 0x20 are not allowed\n");
     if (ret & 0x4)
-	die("Labels with characters *?.,;:/\\|+=<>[]\" are not allowed\n");
+	die("Labels with characters %s are not allowed\n",
+	    volume_label_bad_chars());
     if (ret & 0x10)
 	die("Label can't start with a space character");
 

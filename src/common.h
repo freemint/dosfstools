@@ -42,6 +42,12 @@ extern int write_immed;
  * treats this as a plain boolean. */
 extern int gemdos_semantics;
 
+/* Characters GEMDOS rejects in a directory entry. A volume label is one such
+ * entry in the root directory, mirrored into the boot sector, and both copies
+ * have to hold the same string - so this set governs file names and labels
+ * alike. MS-DOS has a separate, stricter set for each. */
+#define GEMDOS_BAD_CHARS "*?\\/:"
+
 /* program_name used for printing messages; no name will be printed when it is
  * left as NULL */
 extern const char *program_name;
@@ -107,6 +113,7 @@ uint32_t generate_volume_id(void);
  * Generate a 32 bit volume ID
  */
 
+const char *volume_label_bad_chars(void);
 int validate_volume_label(char *doslabel);
 
 /*
