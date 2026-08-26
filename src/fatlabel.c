@@ -93,7 +93,8 @@ static int handle_label(bool change, bool reset, const char *device, char *newla
 	}
 	if (ret & 0x4) {
 	    fprintf(stderr,
-		    "fatlabel: labels with characters *?.,;:/\\|+=<>[]\" are not allowed\n");
+		    "fatlabel: labels with characters %s are not allowed\n",
+		    volume_label_bad_chars());
 	    exit(1);
 	}
 	if (ret & 0x08) {
