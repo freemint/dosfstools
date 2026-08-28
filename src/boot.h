@@ -29,10 +29,10 @@
 void read_boot(DOS_FS * fs);
 void write_boot(unsigned char *sec);
 void write_label(DOS_FS * fs, char *label);
-void write_boot_label(DOS_FS * fs, const char *label);
+int write_boot_label(DOS_FS * fs, const char *label);
 void write_volume_label(DOS_FS * fs, char *label);
 void remove_label(DOS_FS *fs);
-void write_serial(DOS_FS * fs, uint32_t serial);
+int write_serial(DOS_FS * fs, uint32_t serial);
 int check_boot_code(const unsigned char *sec, int end);
 off_t find_volume_de(DOS_FS * fs, DIR_ENT * de);
 const char *pretty_label(const char *label, char rep);
