@@ -27,6 +27,7 @@
  * by Roman Hodek <Roman.Hodek@informatik.uni-erlangen.de> */
 
 #include <limits.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -650,17 +651,26 @@ void read_boot(DOS_FS * fs)
 	die("Filesystem is too large.");
     fs->fat_size = position;
 
-    fs->label[0] = 0;
+    /* this is how check_label() spells "no label in the boot sector" */
+    memmove(fs->label, "NO NAME    ", 11);
     if (fs->fat_bits == 12 || fs->fat_bits == 16) {
 	struct boot_sector_16 *b16 = (struct boot_sector_16 *)&b;
 	if (b16->extended_sig == 0x29) {
-	    memmove(fs->label, b16->label, 11);
-	    fs->serial = b16->serial;
+	    if (check_boot_code((const unsigned char *)&b,
+				offsetof(struct boot_sector_16, label)))
+		fs->serial = b16->serial;
+	    if (check_boot_code((const unsigned char *)&b,
+				offsetof(struct boot_sector_16, fs_type)))
+		memmove(fs->label, b16->label, 11);
 	}
     } else if (fs->fat_bits == 32) {
 	if (b.extended_sig == 0x29) {
-	    memmove(fs->label, &b.label, 11);
-	    fs->serial = b.serial;
+	    if (check_boot_code((const unsigned char *)&b,
+				offsetof(struct boot_sector, label)))
+		fs->serial = b.serial;
+	    if (check_boot_code((const unsigned char *)&b,
+				offsetof(struct boot_sector, fs_type)))
+		memmove(fs->label, &b.label, 11);
 	}
     }
 
@@ -687,7 +697,8 @@ void read_boot(DOS_FS * fs)
 	dump_boot(fs, &b, logical_sector_size);
 }
 
-static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
+/* Returns 0 when the boot sector was left alone because it holds boot code. */
+static int write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	const char *label, uint32_t serial)
 {
     if (fs->fat_bits == 12 || fs->fat_bits == 16) {
@@ -697,7 +708,11 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	if (b16.extended_sig != 0x29) {
 	    if (!check_boot_code((const unsigned char *)&b16,
 				 offsetof(struct boot_sector_16, junk)))
-		die("boot sector is executable, refusing to overwrite its boot code");
+	    {
+		fprintf(stderr, "Warning: boot sector is executable, not writing "
+			"the %s\n", label_mode ? "label" : "serial number");
+		return 0;
+	    }
 
 	    fprintf(stderr, "Warning: boot sector has no FAT%d EBPB, creating one\n", fs->fat_bits);
 
@@ -710,7 +725,11 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 				    label_mode
 					? offsetof(struct boot_sector_16, fs_type)
 					: offsetof(struct boot_sector_16, label)))
-	    die("boot sector is executable, refusing to overwrite its boot code");
+	{
+	    fprintf(stderr, "Warning: boot sector is executable, not writing "
+		    "the %s\n", label_mode ? "label" : "serial number");
+	    return 0;
+	}
 
 	if (label_mode)
 	    memmove(b16.label, label, 11);
@@ -725,7 +744,11 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	if (b.extended_sig != 0x29) {
 	    if (!check_boot_code((const unsigned char *)&b,
 				 offsetof(struct boot_sector, junk)))
-		die("boot sector is executable, refusing to overwrite its boot code");
+	    {
+		fprintf(stderr, "Warning: boot sector is executable, not writing "
+			"the %s\n", label_mode ? "label" : "serial number");
+		return 0;
+	    }
 
 	    fprintf(stderr, "Warning: boot sector has no FAT32 EBPB, creating one\n");
 
@@ -737,7 +760,11 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 				    label_mode
 					? offsetof(struct boot_sector, fs_type)
 					: offsetof(struct boot_sector, label)))
-	    die("boot sector is executable, refusing to overwrite its boot code");
+	{
+	    fprintf(stderr, "Warning: boot sector is executable, not writing "
+		    "the %s\n", label_mode ? "label" : "serial number");
+	    return 0;
+	}
 
 	if (label_mode)
 	    memmove(b.label, label, 11);
@@ -748,16 +775,18 @@ static void write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	if (fs->backupboot_start)
 	    fs_write(fs->backupboot_start, sizeof(b), &b);
     }
+
+    return 1;
 }
 
-void write_boot_label(DOS_FS * fs, const char *label)
+int write_boot_label(DOS_FS * fs, const char *label)
 {
-    write_boot_label_or_serial(1, fs, label, 0);
+    return write_boot_label_or_serial(1, fs, label, 0);
 }
 
-void write_serial(DOS_FS * fs, uint32_t serial)
+int write_serial(DOS_FS * fs, uint32_t serial)
 {
-    write_boot_label_or_serial(0, fs, NULL, serial);
+    return write_boot_label_or_serial(0, fs, NULL, serial);
 }
 
 off_t find_volume_de(DOS_FS * fs, DIR_ENT * de)

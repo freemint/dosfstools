@@ -178,7 +178,8 @@ static void handle_volid(bool change, bool reset, const char *device, const char
 	exit(0);
     }
 
-    write_serial(&fs, serial);
+    if (!write_serial(&fs, serial))
+	exit(1);
 }
 
 
