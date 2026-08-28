@@ -1295,7 +1295,10 @@ void check_label(DOS_FS *fs)
 
 again:
 
-    if (offset != 0 && memcmp(fs->label, "NO NAME    ", 11) == 0 && memcmp(doslabel, "NO NAME    ", 11) != 0) {
+    if (offset != 0 && fs->boot_label_is_code && memcmp(doslabel, "NO NAME    ", 11) != 0) {
+        if (verbose)
+            printf("Volume label '%s' is stored in the root directory only, the boot sector holds boot code in its place.\n", pretty_label(doslabel, 0));
+    } else if (offset != 0 && memcmp(fs->label, "NO NAME    ", 11) == 0 && memcmp(doslabel, "NO NAME    ", 11) != 0) {
         printf("There is no label in boot sector, but there is volume label '%s' stored in root directory\n", pretty_label(doslabel, 0));
         switch (get_choice(1, "  Auto-copying volume label from root directory to boot sector.",
                            3,

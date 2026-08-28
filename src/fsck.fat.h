@@ -173,6 +173,7 @@ typedef struct {
     DOS_FILE **cluster_owner;
     uint32_t serial;
     char label[11];
+    int boot_label_is_code;	/* boot code occupies the boot sector label */
 } DOS_FS;
 
 extern int rw, list, verbose, test, no_spaces_in_sfns;

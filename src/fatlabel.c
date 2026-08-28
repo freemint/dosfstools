@@ -52,7 +52,7 @@ unsigned n_files = 0;
 void *mem_queue = NULL;
 
 
-static void handle_label(bool change, bool reset, const char *device, char *newlabel)
+static int handle_label(bool change, bool reset, const char *device, char *newlabel)
 {
     DOS_FS fs = { 0 };
     off_t offset;
@@ -138,10 +138,12 @@ static void handle_label(bool change, bool reset, const char *device, char *newl
 
     if (fs.fat_bits == 32)
 	release_fat(&fs);
+
+    return 1;
 }
 
 
-static void handle_volid(bool change, bool reset, const char *device, const char *newserial)
+static int handle_volid(bool change, bool reset, const char *device, const char *newserial)
 {
     DOS_FS fs = { 0 };
     char *tmp;
@@ -178,7 +180,7 @@ static void handle_volid(bool change, bool reset, const char *device, const char
 	exit(0);
     }
 
-    write_serial(&fs, serial);
+    return write_serial(&fs, serial);
 }
 
 
@@ -223,6 +225,7 @@ int main(int argc, char *argv[])
     char *tmp;
     long codepage = -1;
     int c;
+    int ret;
 
     /* fatlabel has no --variant option, so the filesystem decides */
     gemdos_semantics = -1;
@@ -290,10 +293,11 @@ int main(int argc, char *argv[])
 	new = argv[optind];
 
     if (!volid_mode)
-	handle_label(change, reset, device, new);
+	ret = handle_label(change, reset, device, new);
     else
-	handle_volid(change, reset, device, new);
+	ret = handle_volid(change, reset, device, new);
 
-    fs_close(rw);
-    return 0;
+    /* a refused change writes nothing */
+    fs_close(ret ? rw : 0);
+    return ret ? 0 : 1;
 }
