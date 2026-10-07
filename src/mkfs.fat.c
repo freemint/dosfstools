@@ -248,6 +248,7 @@ static int size_fat = 0;	/* Size in bits of FAT entries */
 static int size_fat_by_user = 0;	/* 1 if FAT size user selected */
 static int dev = -1;		/* FS block device file handle */
 static off_t part_sector = 0; /* partition offset in sector */
+static off_t part_offset = 0; /* partition offset in bytes */
 static int ignore_safety_checks = 0;	/* Ignore safety checks */
 static struct msdos_boot_sector bs;	/* Boot sector data */
 static int start_data_sector;	/* Sector number for the start of the data area */
@@ -392,8 +393,8 @@ static long do_check(int try, off_t current_block)
     static char buffer[BLOCK_SIZE * TEST_BUFFER_BLOCKS];
     long got;
 
-    if (lseek(dev, part_sector * sector_size + current_block * BLOCK_SIZE, SEEK_SET)	/* Seek to the correct location */
-	!=current_block * BLOCK_SIZE)
+    if (lseek(dev, part_offset + current_block * BLOCK_SIZE, SEEK_SET)	/* Seek to the correct location */
+	!=part_offset + current_block * BLOCK_SIZE)
 	die("seek failed during testing for blocks");
 
     got = read(dev, buffer, try * BLOCK_SIZE);	/* Try reading! */
@@ -1375,7 +1376,7 @@ static void setup_tables(void)
 #define seekto(pos,errstr)						\
   do {									\
     off_t __pos = (pos);						\
-    if (lseek (dev, part_sector * sector_size + __pos, SEEK_SET) != part_sector * sector_size + __pos)				\
+    if (lseek (dev, part_offset + __pos, SEEK_SET) != part_offset + __pos)				\
 	error ("seek to " errstr " failed whilst writing tables");	\
   } while(0)
 
@@ -1964,19 +1965,21 @@ int main(int argc, char **argv)
 	} else {
 	    sector_size = devinfo.sector_size;
 	}
-
-        if (devinfo.size <= part_sector * sector_size)
-          die("The device %s size %llu is less than the offset %llu",
-              device_name, devinfo.size, (unsigned long long) part_sector * sector_size);
     }
+
+    /* --offset counts sectors of this size; -A may grow it later */
+    part_offset = part_sector * sector_size;
+    if (devinfo.size <= part_offset)
+	die("The device %s size %llu is less than the offset %llu",
+	    device_name, devinfo.size, (unsigned long long) part_offset);
 
     if (sector_size > 4096)
 	fprintf(stderr,
 		"Warning: sector size %d > 4096 is non-standard, filesystem may not be usable\n",
 		sector_size);
 
-    cblocks = (devinfo.size - part_sector * sector_size) / BLOCK_SIZE;
-    orphaned_sectors = ((devinfo.size - part_sector * sector_size) % BLOCK_SIZE) / sector_size;
+    cblocks = (devinfo.size - part_offset) / BLOCK_SIZE;
+    orphaned_sectors = ((devinfo.size - part_offset) % BLOCK_SIZE) / sector_size;
 
     if (blocks_specified) {
 	if (blocks != cblocks) {
