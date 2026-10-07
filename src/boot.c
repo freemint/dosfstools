@@ -705,7 +705,7 @@ void read_boot(DOS_FS * fs)
 	if (b16->extended_sig == 0x29) {
 	    if (check_boot_code((const unsigned char *)&b,
 				offsetof(struct boot_sector_16, label)))
-		fs->serial = b16->serial;
+		fs->serial = le32toh(b16->serial);
 	    if (check_boot_code((const unsigned char *)&b,
 				offsetof(struct boot_sector_16, fs_type)))
 		memmove(fs->label, b16->label, 11);
@@ -718,7 +718,7 @@ void read_boot(DOS_FS * fs)
 	if (b.extended_sig == 0x29) {
 	    if (check_boot_code((const unsigned char *)&b,
 				offsetof(struct boot_sector, label)))
-		fs->serial = b.serial;
+		fs->serial = le32toh(b.serial);
 	    if (check_boot_code((const unsigned char *)&b,
 				offsetof(struct boot_sector, fs_type)))
 		memmove(fs->label, &b.label, 11);
@@ -798,7 +798,7 @@ static int write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	if (label_mode)
 	    memmove(b16.label, label, 11);
 	else
-	    b16.serial = serial;
+	    b16.serial = htole32(serial);
 
 	write_boot((unsigned char *)&b16);
     } else if (fs->fat_bits == 32) {
@@ -832,7 +832,7 @@ static int write_boot_label_or_serial(int label_mode, DOS_FS * fs,
 	if (label_mode)
 	    memmove(b.label, label, 11);
 	else
-	    b.serial = serial;
+	    b.serial = htole32(serial);
 
 	write_boot((unsigned char *)&b);
 	if (fs->backupboot_start)
