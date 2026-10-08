@@ -52,14 +52,11 @@ much.
 It will also obey the maximum number of sectors GEMDOS can handle.
 Larger filesystems are managed by raising the logical sector size, up to 16 KiB;
 this limits an Atari filesystem to just under 1 GiB.
-A 12 bit FAT is used only for filesystems that have one of the usual floppy
-sizes (720k, 1.2M, 1.44M, 2.88M), a 16 bit FAT otherwise.
-This can be overridden with the \fB\-F\fP option.
+Atari mode makes hard disk partitions, which always have a 16 bit FAT; the size
+of a floppy disk is refused, since TOS reads floppies made in standard mode.
 A 32 bit FAT is never chosen automatically in Atari mode, and always uses the
 standard variant.
-The boot sector always uses the MS-DOS layout; on a 12 bit FAT an
-Atari-compatible 24 bit serial number is additionally stored at offset 8, so
-that TOS can detect a media change.
+The boot sector always uses the MS-DOS layout.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4

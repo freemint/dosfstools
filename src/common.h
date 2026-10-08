@@ -113,6 +113,7 @@ uint32_t generate_volume_id(void);
  * Generate a 32 bit volume ID
  */
 
+int atari_floppy_sectors(unsigned sectors);
 unsigned read_atari_boot_checksum(const unsigned char *sec);
 const char *volume_label_bad_chars(void);
 int validate_volume_label(char *doslabel);

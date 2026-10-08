@@ -640,6 +640,15 @@ static void establish_params(struct device_info *info)
 	}
     }
 
+    /* -A makes hard disk partitions, on which GEMDOS always uses a 16 bit
+     * FAT; TOS reads floppies made without -A */
+    if (gemdos_semantics) {
+	if (size_fat == 12)
+	    die("-A can't make a 12 bit FAT; for a floppy, leave out -A");
+	if (sector_size == 512 && atari_floppy_sectors(info->size / 512))
+	    die("This is the size of a floppy; floppies are made without -A");
+    }
+
     /* GEMDOS cannot read FAT32, so -A grows FAT16 by scaling sectors instead */
     if (!size_fat && !gemdos_semantics && info->size >= 512 * 1024 * 1024) {
 	if (verbose)
@@ -983,14 +992,7 @@ static void setup_tables(void)
     } else {
 	unsigned clusters, maxclust, fatdata;
 
-	/* GEMDOS always uses a 12 bit FAT on floppies, and always a 16 bit FAT on
-	 * hard disks. So use 12 bit if the size of the filesystem suggests that
-	 * this fs is for a floppy disk, if the user hasn't explicitly requested a
-	 * size.
-	 */
-	if (!size_fat)
-	    size_fat = (num_sectors == 1440 || num_sectors == 2400 ||
-			num_sectors == 2880 || num_sectors == 5760) ? 12 : 16;
+	size_fat = 16;
 	if (verbose >= 2)
 	    printf("Choosing %d bits for FAT\n", size_fat);
 
@@ -1055,16 +1057,7 @@ static void setup_tables(void)
 
 	cluster_count = clusters;
 	bs.fat_length = htole16(fat_length);
-	memcpy(vi->fs_type, size_fat == 12 ? MSDOS_FAT12_SIGN :
-	       MSDOS_FAT16_SIGN, 8);
-	if (size_fat == 12) {
-	    /* TOS reads a little-endian 24-bit serial number at offset 8 (the
-	     * tail of the OEM field) to detect floppy media change; make it
-	     * unique per disk. DOS treats the OEM field as opaque text. */
-	    bs.system_id[5] = (unsigned char)(volume_id & 0x000000ff);
-	    bs.system_id[6] = (unsigned char)((volume_id & 0x0000ff00) >> 8);
-	    bs.system_id[7] = (unsigned char)((volume_id & 0x00ff0000) >> 16);
-	}
+	memcpy(vi->fs_type, MSDOS_FAT16_SIGN, 8);
     }
 
     if (fill_mbr_partition) {

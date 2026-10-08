@@ -120,6 +120,14 @@ are for this purpose (but the standard value is still 0xfff7).
 In short file names and volume labels GEMDOS rejects only the characters
 \fB*?\e/:".\fP, while MS-DOS also rejects \fB<>|\fP in file names and
 \fB+,;<=>[]|\fP in labels.
+MS-DOS chooses between a 12 and a 16 bit FAT by the number of clusters, while
+Atari uses a 12 bit FAT on floppy disks and a 16 bit FAT on hard disk partitions
+whatever their size: with the Atari variant, a filesystem of 512-byte sectors
+that has the size of an Atari floppy format is taken to have a 12 bit FAT, any
+other a 16 bit FAT.
+In the standard variant, an Atari filesystem with fewer than 4085 clusters would
+be taken to have a 12 bit FAT and be damaged by a repair, so check it with
+\fB\-A\fP.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4

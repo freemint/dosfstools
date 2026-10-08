@@ -685,9 +685,7 @@ void read_boot(DOS_FS * fs)
 	/* If more clusters than fat entries in 16-bit fat, we assume
 	 * it's a real MSDOS FS with 12-bit fat. */
 	if (fs->data_clusters + 2 > fat_length * logical_sector_size * 8 / 16 ||
-	    /* if it has one of the usual floppy sizes -> 12bit FAT  */
-	    (total_sectors == 720 || total_sectors == 1440 ||
-	     total_sectors == 2880))
+	    (logical_sector_size == 512 && atari_floppy_sectors(total_sectors)))
 	    fs->fat_bits = 12;
     }
     /* On FAT32, the high 4 bits of a FAT entry are reserved */
