@@ -194,4 +194,9 @@ int fs_type(void)
 {
     return gettype(fd);
 }
+
+int fs_gemdos_partition(void)
+{
+    return gemdos_partition(fd);
+}
 #endif

@@ -128,6 +128,7 @@ other a 16 bit FAT.
 In the standard variant, an Atari filesystem with fewer than 4085 clusters would
 be taken to have a 12 bit FAT and be damaged by a repair, so check it with
 \fB\-A\fP.
+On FreeMiNT, a GEM or BGM partition always has a 16 bit FAT.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
 .IP "\fB\-a\fP" 4
