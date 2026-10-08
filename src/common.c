@@ -294,6 +294,31 @@ uint32_t generate_volume_id(void)
     return ((uint32_t)now.tv_sec << 20) | (uint32_t)now.tv_usec;
 }
 
+/* TOS always uses a 12 bit FAT on a floppy disk and a 16 bit FAT on a hard disk
+ * partition; a filesystem of 512-byte sectors whose sector count matches a
+ * floppy format is taken as a floppy. */
+int atari_floppy_sectors(unsigned sectors)
+{
+    static const struct {
+	unsigned spt, min_tracks, max_tracks, min_sides;
+    } formats[] = {
+	{ 9, 80, 83, 1 }, { 10, 80, 83, 1 }, { 11, 80, 83, 1 },	/* DD */
+	{ 8, 40, 40, 1 }, { 9, 40, 40, 1 },	/* 5.25" DD */
+	{ 15, 80, 80, 2 },			/* 5.25" HD */
+	{ 18, 80, 83, 2 }, { 19, 80, 83, 2 }, { 20, 80, 83, 2 },
+	{ 21, 80, 83, 2 },			/* HD */
+	{ 36, 80, 80, 2 },			/* ED */
+    };
+    unsigned i, tracks, s;
+
+    for (i = 0; i < sizeof(formats) / sizeof(formats[0]); i++)
+	for (tracks = formats[i].min_tracks; tracks <= formats[i].max_tracks; tracks++)
+	    for (s = formats[i].min_sides; s <= 2; s++)
+		if (sectors == formats[i].spt * tracks * s)
+		    return 1;
+    return 0;
+}
+
 /* Sum of all 256 big-endian words of a 512-byte boot sector. An Atari boot
  * sector is executable by TOS only when this sum equals 0x1234. */
 unsigned read_atari_boot_checksum(const unsigned char *sec)
