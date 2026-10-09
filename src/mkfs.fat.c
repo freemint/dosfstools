@@ -1974,7 +1974,6 @@ int main(int argc, char **argv)
 	    }
 	} else {
 	    sector_size = devinfo.sector_size;
-	    sector_size_set = 1;
 	}
 
         if (devinfo.size <= part_sector * sector_size)
