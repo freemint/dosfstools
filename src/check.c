@@ -772,8 +772,6 @@ static void test_file(DOS_FS * fs, DOS_FILE * file, int read_test)
     prev = clusters = 0;
     for (walk = FSTART(file, fs); walk > 1 && walk < fs->data_clusters + 2;
 	 walk = next_clu) {
-	next_clu = next_cluster(fs, walk);
-
 	/* In this stage we are checking only for a loop within our own
 	 * cluster chain.
 	 * Cross-linking of clusters is handled in check_file()
@@ -792,8 +790,10 @@ static void test_file(DOS_FS * fs, DOS_FILE * file, int read_test)
 	    }
 	    break;
 	}
+	/* check_file() truncates the chain here */
 	if (bad_cluster(fs, walk))
 	    break;
+	next_clu = next_cluster(fs, walk);
 	if (read_test) {
 	    if (fs_test(cluster_start(fs, walk), fs->cluster_size)) {
 		prev = walk;
