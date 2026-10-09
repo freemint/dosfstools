@@ -1089,6 +1089,11 @@ static void setup_tables(void)
 	needs_tos404 = !tos104_compatible(clusters, fat_length,
 					  cdiv(root_dir_entries * 32, sector_size));
 
+	/* -r asks for at least that many entries; the root directory has to
+	 * fill whole sectors, which have grown */
+	root_dir_entries = cdiv(root_dir_entries * 32, sector_size) *
+	    (sector_size / 32);
+
 	cluster_count = clusters;
 	bs.fat_length = htole16(fat_length);
 	memcpy(vi->fs_type, MSDOS_FAT16_SIGN, 8);
