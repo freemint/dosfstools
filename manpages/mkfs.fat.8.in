@@ -50,8 +50,11 @@ In Atari mode, if not directed otherwise by the user, \fBmkfs.fat\fP will
 always use 2 sectors per cluster, since GEMDOS doesn't like other values very
 much.
 It will also obey the maximum number of sectors GEMDOS can handle.
-Larger filesystems are managed by raising the logical sector size, up to 16 KiB;
-this limits an Atari filesystem to just under 1 GiB.
+Larger filesystems are managed by raising the logical sector size, up to 16 KiB,
+which limits an Atari filesystem to 1 GiB.
+TOS 1.04 to 3.06 handles clusters of up to 16 KiB and filesystems of up to
+about 512 MiB; \fBmkfs.fat\fP warns when a filesystem needs TOS 4.04 or EmuTOS,
+and when it has more than 32765 sectors, which TOS before 1.04 can't handle.
 Atari mode makes hard disk partitions, which always have a 16 bit FAT; the size
 of a floppy disk is refused, since TOS reads floppies made in standard mode.
 A 32 bit FAT is never chosen automatically in Atari mode, and always uses the

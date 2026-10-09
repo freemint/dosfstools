@@ -129,8 +129,12 @@ static inline int cdiv(int a, int b)
 #define MAX_CLUST_32	268435446
 
 #define OLDGEMDOS_MAX_SECTORS	32765
-#define GEMDOS_MAX_SECTORS	65531
+/* AHDI reads only the 16 bit sector count and takes record 0xffff as a flag */
+#define GEMDOS_MAX_SECTORS	65535
 #define GEMDOS_MAX_SECTOR_SIZE	(16*1024)
+/* TOS before 4.04 takes the log2 of the cluster size with a signed shift,
+ * which never ends for 32 KiB */
+#define TOS104_MAX_CLUSTER_SIZE	(16*1024)
 
 #define BOOTCODE_SIZE		448
 #define BOOTCODE_FAT32_SIZE	420
@@ -251,6 +255,7 @@ static off_t part_sector = 0; /* partition offset in sector */
 static off_t part_offset = 0; /* partition offset in bytes */
 static int ignore_safety_checks = 0;	/* Ignore safety checks */
 static struct msdos_boot_sector bs;	/* Boot sector data */
+static int needs_tos404 = 0;	/* -A filesystem beyond TOS 1.04 to 3.06 */
 static int start_data_sector;	/* Sector number for the start of the data area */
 static int start_data_block;	/* Block number for the start of the data area */
 static unsigned char *fat;	/* File allocation table */
@@ -700,6 +705,21 @@ static unsigned int align_object(unsigned int sectors, unsigned int clustsize)
 
 /* Create the filesystem data tables */
 
+/* TOS 1.04 to 3.06 numbers clusters and records with signed 16 bit values. A
+ * negative cluster number means FAT or root directory; so does a negative
+ * record number, unless it lies below all of their records. */
+static int tos104_compatible(unsigned clusters, unsigned fat_length,
+			     unsigned root_sectors)
+{
+    long cs = bs.cluster_size;
+    long fatrec = reserved_sectors + fat_length;	/* second FAT */
+
+    if (cs * sector_size > TOS104_MAX_CLUSTER_SIZE || clusters + 2 > 32768)
+	return 0;
+    return (clusters + 2) * cs <= 65536 - 2 * fatrec -
+	(1 + cdiv(root_sectors, cs) + cdiv(fat_length, cs)) * cs;
+}
+
 static void setup_tables(void)
 {
     unsigned cluster_count = 0, fat_length;
@@ -1003,6 +1023,12 @@ static void setup_tables(void)
 	bs.cluster_size = sectors_per_cluster ? sectors_per_cluster : 2;
 	if (!sector_size_set) {
 	    while (num_sectors > GEMDOS_MAX_SECTORS) {
+		/* a power-of-two size is just over the limit; leaving less than
+		 * a cluster unused beats doubling the sector size */
+		if (num_sectors - GEMDOS_MAX_SECTORS < bs.cluster_size) {
+		    num_sectors = GEMDOS_MAX_SECTORS;
+		    break;
+		}
 		num_sectors >>= 1;
 		sector_size <<= 1;
 	    }
@@ -1036,8 +1062,13 @@ static void setup_tables(void)
 		       sector_size, clusters, fat_length, maxclust);
 
 	    /* last 10 cluster numbers are special; first two numbers are
-	     * reserved (size_fat is always 12 or 16 here) */
-	    if (maxclust <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2)
+	     * reserved (size_fat is always 12 or 16 here); prefer a sector
+	     * size that TOS 1.04 can handle while it keeps clusters <= 16 KiB */
+	    if (maxclust <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2 &&
+		(sector_size_set ||
+		 bs.cluster_size * sector_size >= TOS104_MAX_CLUSTER_SIZE ||
+		 tos104_compatible(clusters, fat_length,
+				   cdiv(root_dir_entries * 32, sector_size))))
 		break;
 	    if (verbose >= 2)
 		printf(clusters > maxclust - 2 ?
@@ -1054,6 +1085,9 @@ static void setup_tables(void)
 	if (sector_size > GEMDOS_MAX_SECTOR_SIZE)
 	    die("Would need a sector size > 16k, which GEMDOS can't work with; "
 		"a larger filesystem needs -F 32 without -A");
+
+	needs_tos404 = !tos104_compatible(clusters, fat_length,
+					  cdiv(root_dir_entries * 32, sector_size));
 
 	cluster_count = clusters;
 	bs.fat_length = htole16(fat_length);
@@ -1188,12 +1222,14 @@ static void setup_tables(void)
 
     if (gemdos_semantics) {
 	/* Just some consistency checks */
-	if (num_sectors >= GEMDOS_MAX_SECTORS)
-	    die("GEMDOS can't handle more than 65531 sectors; use a larger "
+	if (num_sectors > GEMDOS_MAX_SECTORS)
+	    die("GEMDOS can't handle more than 65535 sectors; use a larger "
 		"sector size, or -F 32 without -A");
+	else if (needs_tos404)
+	    fprintf(stderr, "Warning: this filesystem needs TOS 4.04 or EmuTOS\n");
 	else if (num_sectors >= OLDGEMDOS_MAX_SECTORS)
-	    printf("Warning: More than 32765 sector need TOS 1.04 "
-		   "or higher.\n");
+	    fprintf(stderr, "Warning: more than 32765 sectors need TOS 1.04 "
+		    "or higher\n");
     }
     if (num_sectors >= 65536) {
 	bs.sectors = htole16(0);
