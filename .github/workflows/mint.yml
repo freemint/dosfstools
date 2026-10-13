@@ -1,0 +1,76 @@
+name: MiNT
+on:
+  push:
+    branches: [ mint-4.2-git ]
+    tags: [ 'v*-mint' ]
+  pull_request:
+    branches: [ mint-4.2-git ]
+  workflow_dispatch:
+env:
+  PACKAGENAME: dosfstools
+  CROSS_TOOL: m68k-atari-mint
+  DEF_CFLAGS: -O2 -fomit-frame-pointer -Wall
+
+jobs:
+  mint-build:
+    name: Cross-compile for MiNT (${{ matrix.cpu }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { cpu: '000', cflags: -m68000 }
+        - { cpu: '020', cflags: -m68020-60 }
+        - { cpu: 'v4e', cflags: -mcpu=5475 }
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Install packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y autoconf automake gettext
+        SYSROOT_DIR="/" ./.scripts/install-freemint.sh binutils gcc mintbin
+        ./.scripts/install-freemint.sh mintlib fdlibm
+    - name: build
+      run: |
+        ./autogen.sh
+        ./configure --host=$CROSS_TOOL --prefix=/usr --sbindir=/sbin --enable-compat-symlinks --without-iconv CFLAGS="${{ matrix.cflags }} $DEF_CFLAGS"
+        make -j$(nproc) install-strip DESTDIR=$PWD/installdir
+        if [ "$GITHUB_REF_TYPE" = tag ]; then VERSION=${GITHUB_REF_NAME#v}; VERSION=${VERSION%-mint}; else VERSION=git-${GITHUB_SHA::7}; fi
+        cd installdir
+        tar --owner=0 --group=0 -cjvf ../$PACKAGENAME-$VERSION-mint${{ matrix.cpu }}.tar.bz2 *
+    - if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: failure-logs-${{ matrix.cpu }}
+        path: config.log
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PACKAGENAME }}-mint${{ matrix.cpu }}
+        path: ${{ env.PACKAGENAME }}-*.tar.bz2
+
+  # A tag gets its archives attached to the release of that name, which is
+  # created as a draft if there is none yet
+  release:
+    if: github.ref_type == 'tag'
+    needs: mint-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+    - name: Attach archives
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1
+        then
+          gh release upload "$GITHUB_REF_NAME" $PACKAGENAME-*.tar.bz2 --clobber
+        else
+          gh release create "$GITHUB_REF_NAME" $PACKAGENAME-*.tar.bz2 --draft --verify-tag --title "$PACKAGENAME ${GITHUB_REF_NAME#v}" --notes ""
+        fi
