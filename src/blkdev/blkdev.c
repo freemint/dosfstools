@@ -35,6 +35,10 @@
 # include <sys/disk.h>
 #endif
 
+#ifdef __MINT__
+#include "mint_io.h"
+#endif
+
 #include "blkdev.h"
 #include "linux_version.h"
 
@@ -209,6 +213,14 @@ int blkdev_get_sector_size(int fd, int *sector_size)
 #ifdef BLKSSZGET
 	if (ioctl(fd, BLKSSZGET, sector_size) >= 0)
 		return 0;
+	return -1;
+#elif defined(__MINT__)
+	unsigned long size;
+
+	if (ioctl(fd, BLOCKSIZE, &size) >= 0) {
+		*sector_size = size;
+		return 0;
+	}
 	return -1;
 #else
 	(void)fd; /* prevent unused parameter warning */
