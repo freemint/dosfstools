@@ -53,13 +53,16 @@ It will also obey the maximum number of sectors GEMDOS can handle.
 Larger filesystems are managed by raising the logical sector size, up to 16 KiB,
 which limits an Atari filesystem to 1 GiB.
 TOS 1.04 to 3.06 handles clusters of up to 16 KiB and filesystems of up to
-about 512 MiB; \fBmkfs.fat\fP warns when a filesystem needs TOS 4.04 or EmuTOS,
-and when it has more than 32765 sectors, which TOS before 1.04 can't handle.
+about 512 MiB; where only the last few sectors would be out of its reach, these
+are left unused.
+\fBmkfs.fat\fP warns when a filesystem needs TOS 4.04 or EmuTOS, and when it has
+more than 32765 sectors, which TOS before 1.04 can't handle.
 Atari mode makes hard disk partitions, which always have a 16 bit FAT whatever
 their size; floppy disks are not supported.
 The size of a filesystem never makes Atari mode use a 32 bit FAT.
-A 32 bit FAT, asked for with \fB\-F 32\fP, has the standard layout; only the
-volume label and the end-of-chain marks in the FAT follow the Atari variant.
+A 32 bit FAT, asked for with \fB\-F 32\fP or by an F32 partition on FreeMiNT,
+has the standard layout; only the volume label and the end-of-chain marks in
+the FAT follow the Atari variant.
 The boot sector always uses the MS-DOS layout.
 .\" ----------------------------------------------------------------------------
 .SH OPTIONS
@@ -139,8 +142,9 @@ Use this option to override this behaviour.
 Sets the volume ID of the newly created filesystem; \fIVOLUME-ID\fP is a 32-bit
 hexadecimal number (for example, 2e24ec82).
 The default is a number which depends on the filesystem creation time.
-If the boot sector would then happen to be executable by TOS, the lowest bit
-of the ID is flipped and a warning is printed.
+A generated ID that would make the boot sector executable by TOS has its lowest
+bit flipped, with a warning; in Atari mode, an ID given here that does so is
+refused unless \fB\-I\fP is given.
 .IP "\fB\-I\fP" 4
 Ignore and disable safety checks.
 By default \fBmkfs.fat\fP refuses to create a filesystem on a device with
@@ -151,6 +155,8 @@ One doesn't always need partitions on MO disks.
 The filesystem can go directly to the whole disk.
 Under other OSes this is known as the \fIsuperfloppy\fP format.
 This switch will force \fBmkfs.fat\fP to work properly.
+On FreeMiNT, it also allows a filesystem that does not match the partition ID,
+see \fB\-\-variant\fP.
 .IP "\fB\-l\fP \fIFILENAME\fP" 4
 Read the bad blocks list from \fIFILENAME\fP.
 .IP "\fB\-m\fP \fIMESSAGE-FILE\fP" 4
@@ -220,6 +226,15 @@ Create a filesystem of variant \fITYPE\fP.
 Acceptable values are \fIstandard\fP and \fIatari\fP (in any combination of
 upper/lower case).
 The default is \fIstandard\fP.
+On FreeMiNT \fIauto\fP is accepted as well and is the default: the partition ID
+picks the variant as for \fBfsck.fat\fP, a DOS ID meaning \fIstandard\fP and any
+other \fIatari\fP, and the FAT size: 16 bit for GEM and BGM, 32 bit for F32, and
+for the DOS types 12 bit for 0x01, 16 bit for 0x04, 0x06 and 0x0E, and 32 bit
+for 0x0B and 0x0C.
+A filesystem that does not match the partition ID, or any filesystem on a
+partition of another ID, needs \fB\-I\fP.
+A target that is not a partition, such as an image file, gets the \fIatari\fP
+variant.
 See above under DESCRIPTION for the differences.
 .IP "\fB\-\-help\fP" 4
 Display option summary and exit.

@@ -51,6 +51,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#ifdef __MINT__
+#include "mint_io.h"
+#endif
+
 #include "blkdev.h"
 #include "device_info.h"
 
@@ -319,6 +323,12 @@ int get_device_info(int fd, struct device_info *info)
 
 #ifdef __linux__
     get_block_linux_info(info, fd, stat.st_rdev);
+#endif
+
+#ifdef __MINT__
+    /* a drive accessed through XHDI is a hard disk partition, not a floppy */
+    if (gettype(fd) != -1)
+	info->type = TYPE_FIXED;
 #endif
 
     return 0;

@@ -70,6 +70,14 @@
 #include "device_info.h"
 #include "charconv.h"
 
+#ifdef __MINT__
+#include "mint_io.h"
+#endif
+
+/* mintlib has no SA_RESTART */
+#ifndef SA_RESTART
+#define SA_RESTART 0
+#endif
 
 /* Constant definitions */
 
@@ -562,6 +570,36 @@ static void check_mount(char *device_name)
 	die("%s contains a mounted filesystem.", device_name);
 }
 
+#ifdef __MINT__
+/* The XHDI partition ID says how TOS will mount the partition, so it picks
+ * the variant as for fsck.fat, and the FAT size; anything else needs -I */
+static void use_partition_id(void)
+{
+    char name[5];
+    int id_semantics = gettype(dev);
+    int id_fat = partition_fat_bits(dev, name);
+
+    if (id_fat < 0)
+	return;
+
+    if (gemdos_semantics == -1)
+	gemdos_semantics = id_semantics;
+    if (!size_fat && id_fat) {
+	size_fat = id_fat;
+	size_fat_by_user = 1;
+    }
+
+    if (ignore_safety_checks)
+	return;
+    if (!id_fat)
+	die("Partition ID %s is not for a FAT filesystem (use -I to override)",
+	    name);
+    if (size_fat != id_fat || gemdos_semantics != id_semantics)
+	die("Partition ID %s needs a %d bit FAT of the %s variant (use -I to override)",
+	    name, id_fat, id_semantics ? "Atari" : "standard");
+}
+#endif
+
 /* Establish the geometry and media parameters for the device */
 
 static void establish_params(struct device_info *info)
@@ -703,17 +741,20 @@ static unsigned int align_object(unsigned int sectors, unsigned int clustsize)
 
 /* TOS 1.04 to 3.06 numbers clusters and records with signed 16 bit values. A
  * negative cluster number means FAT or root directory; so does a negative
- * record number, unless it lies below all of their records. */
-static int tos104_compatible(unsigned clusters, unsigned fat_length,
-			     unsigned root_sectors)
+ * record number, unless it lies below all of their records. Returns how many
+ * clusters these versions can address, 0 if they can't use clusters this
+ * large. */
+static long tos104_max_clusters(unsigned fat_length, unsigned root_sectors)
 {
     long cs = bs.cluster_size;
     long fatrec = reserved_sectors + fat_length;	/* second FAT */
+    long records;
 
-    if (cs * sector_size > TOS104_MAX_CLUSTER_SIZE || clusters + 2 > 32768)
+    if (cs * sector_size > TOS104_MAX_CLUSTER_SIZE)
 	return 0;
-    return (clusters + 2) * cs <= 65536 - 2 * fatrec -
+    records = 65536 - 2 * fatrec -
 	(1 + cdiv(root_sectors, cs) + cdiv(fat_length, cs)) * cs;
+    return records / cs - 2 < 32766 ? records / cs - 2 : 32766;
 }
 
 static void setup_tables(void)
@@ -1057,12 +1098,26 @@ static void setup_tables(void)
 	    /* last 10 cluster numbers are special; first two numbers are
 	     * reserved (size_fat is always 12 or 16 here); prefer a sector
 	     * size that TOS 1.04 can handle while it keeps clusters <= 16 KiB */
-	    if (clusters + 2 <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2 &&
-		(sector_size_set ||
-		 bs.cluster_size * sector_size >= TOS104_MAX_CLUSTER_SIZE ||
-		 tos104_compatible(clusters, fat_length,
-				   cdiv(root_dir_entries * 32, sector_size))))
-		break;
+	    if (clusters + 2 <= (1 << size_fat) - 0x10 && clusters <= maxclust - 2) {
+		unsigned root_sectors = cdiv(root_dir_entries * 32, sector_size);
+		long tos104 = tos104_max_clusters(fat_length, root_sectors);
+
+		if (sector_size_set || (long)clusters <= tos104)
+		    break;
+		/* if just the last records are out of reach, leaving them
+		 * unused beats doubling the sector size */
+		if (tos104 > 0 && clusters <= 32766) {
+		    unsigned trimmed = reserved_sectors + nr_fats * fat_length +
+			root_sectors + tos104 * bs.cluster_size;
+
+		    if (trimmed < num_sectors) {
+			num_sectors = trimmed;
+			continue;
+		    }
+		}
+		if (bs.cluster_size * sector_size >= TOS104_MAX_CLUSTER_SIZE)
+		    break;
+	    }
 	    if (verbose >= 2)
 		printf(clusters + 2 > (1 << size_fat) - 0x10 ||
 		       clusters > maxclust - 2 ? "Too many clusters\n" :
@@ -1080,8 +1135,8 @@ static void setup_tables(void)
 	    die("Would need a sector size > 16k, which GEMDOS can't work with; "
 		"a larger filesystem needs -F 32");
 
-	needs_tos404 = !tos104_compatible(clusters, fat_length,
-					  cdiv(root_dir_entries * 32, sector_size));
+	needs_tos404 = (long)clusters > tos104_max_clusters(fat_length,
+				cdiv(root_dir_entries * 32, sector_size));
 
 	/* -r asks for at least that many entries; the root directory has to
 	 * fill whole sectors, which have grown */
@@ -1551,7 +1606,11 @@ static void usage(const char *name, int exitval)
     fprintf(stderr, "  -s COUNT        Set number of sectors per cluster to COUNT\n");
     fprintf(stderr, "  -S SIZE         Select a sector size of SIZE (a power of two, at least 512)\n");
     fprintf(stderr, "  -v              Verbose execution\n");
+#ifdef __MINT__
+    fprintf(stderr, "  --variant=TYPE  Select variant TYPE of filesystem (standard, atari or auto)\n");
+#else
     fprintf(stderr, "  --variant=TYPE  Select variant TYPE of filesystem (standard or atari)\n");
+#endif
     fprintf(stderr, "\n");
     fprintf(stderr, "  --help          Show this help message and exit\n");
     exit(exitval);
@@ -1610,6 +1669,9 @@ int main(int argc, char **argv)
     }
 
     volume_id = generate_volume_id();
+#ifdef __MINT__
+    gemdos_semantics = -1;	/* --variant=auto */
+#endif
 
     printf("mkfs.fat " VERSION " (" VERSION_DATE ")\n");
 
@@ -1901,6 +1963,10 @@ int main(int argc, char **argv)
 		    gemdos_semantics = 0;
 	    } else if (!strcasecmp(optarg, "atari")) {
 		    gemdos_semantics = 1;
+#ifdef __MINT__
+	    } else if (!strcasecmp(optarg, "auto")) {
+		    gemdos_semantics = -1;
+#endif
 	    } else {
 		    printf("Unknown variant: %s\n", optarg);
 		    usage(argv[0], 1);
@@ -2047,6 +2113,14 @@ int main(int argc, char **argv)
         else
             fill_mbr_partition = 0;
     }
+
+#ifdef __MINT__
+    use_partition_id();
+    /* a target that is not a partition, such as an image file, is made like
+     * a hard disk partition */
+    if (gemdos_semantics == -1)
+	gemdos_semantics = 1;
+#endif
 
     establish_params(&devinfo);
     /* Establish the media parameters */

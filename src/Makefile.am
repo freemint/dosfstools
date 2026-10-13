@@ -41,12 +41,12 @@ devinfo_common_sources = device_info.c device_info.h \
 			 blkdev/linux_version.c blkdev/linux_version.h
 mkfs_fat_SOURCES  = mkfs.fat.c msdos_fs.h common.c common.h endian_compat.h \
 		    $(charconv_common_sources) $(devinfo_common_sources)
-mkfs_fat_CPPFLAGS = -I$(srcdir)/blkdev
+mkfs_fat_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/blkdev
 mkfs_fat_CFLAGS   = $(AM_CFLAGS)
 mkfs_fat_LDADD    = $(charconv_common_ldadd)
 
 testdevinfo_SOURCES  = testdevinfo.c $(devinfo_common_sources)
-testdevinfo_CPPFLAGS = -I$(srcdir)/blkdev
+testdevinfo_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/blkdev
 testdevinfo_CFLAGS   = $(AM_CFLAGS)
 
 # libIO is a git submodule, so a tree without it can still make a tarball;
@@ -56,6 +56,8 @@ libio_sources = libIO/mint_io.c libIO/xhdi.c
 endif
 nodist_fsck_fat_SOURCES = $(libio_sources)
 nodist_fatlabel_SOURCES = $(libio_sources)
+nodist_mkfs_fat_SOURCES = $(libio_sources)
+nodist_testdevinfo_SOURCES = $(libio_sources)
 
 dist-hook:
 	if test -f $(srcdir)/libIO/mint_io.c; then \
