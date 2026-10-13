@@ -130,7 +130,7 @@ static int cp850_char_to_printable(char **p, unsigned char c, unsigned int out_s
     if (ret != (size_t)-1)
         *p += ret;
     else if (!(c & 0x80))
-        *(*p++) = c;
+        *(*p)++ = c;
     else {
         ret = strlen(cp850_translit_table[c & 0x7F]);
         if (ret > out_size)
